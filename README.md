@@ -27,12 +27,13 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Seslendirme:** geri sayımlı mikrofon kaydı, seviye göstergesi, dalga görünümü, kırpma, kaydırma, açılış/kapanış geçişi
 - **Ses iyileştirme:** uğultu temizleme, gürültü kapısı, EQ, kompresör, normalize, önce/sonra dinleme
 - **Otomatik kısma:** konuşurken video sesini kendiliğinden kısar
-- **Dışa aktarma:** 1080×1920 MP4 ya da WebM (tarayıcının desteğine göre), tek kare PNG
+- **Dışa aktarma:** 1080×1920 standart MP4 (H.264 High + AAC, sabit 30 fps) — WhatsApp ve Instagram'da sorunsuz açılır; tek kare PNG
 
 ## Notlar
 
 - Dışa aktarma gerçek zamanlıdır: 30 sn'lik video yaklaşık 30 sn sürer, sekmeyi açık tut.
 - Fontlar: Anton, Bebas Neue, Montserrat, Poppins Google Fonts'tan yüklenir (SIL Open Font License). Impact, Arial ve Georgia sistem fontlarıdır, bilgisayarında yoksa yedek font kullanılır.
+- MP4 dönüştürme için [Mediabunny](https://mediabunny.dev) (MPL-2.0) dışa aktarma sırasında CDN'den yüklenir; bunun için internet gerekir. İnternet yoksa ham kayıt indirilir.
 - Bu proje YouTube veya Google ile bağlantılı değildir.
 
 ## Lisans

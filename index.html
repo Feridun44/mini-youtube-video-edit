@@ -1145,15 +1145,30 @@ $('btnExport').onclick = () => {
   const chunks = [];
   rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   S.exporting = {rec, chunks, ext: mm.ext, cancelled: false};
-  rec.onstop = () => {
+  rec.onstop = async () => {
     const ex = S.exporting; S.exporting = null;
     if (ex.cancelled){ $('exportBox').classList.remove('show'); return; }
-    const blob = new Blob(chunks, {type: mm.m.split(';')[0]});
-    const url = URL.createObjectURL(blob);
-    const name = `kurgu-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.${mm.ext}`;
-    $('exDl').href = url; $('exDl').download = name; $('exDl').style.display = 'block';
+    const raw = new Blob(chunks, {type: mm.m.split(';')[0]});
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    let blob = raw, ext = mm.ext, note = '';
+    // Tarayıcı kaydı parçalı / değişken kare hızlı olur; WhatsApp, Instagram gibi uygulamalar
+    // açamayabilir. Standart MP4'e çevir (H.264 + AAC, 30 fps sabit, moov başta).
+    $('exCancel').textContent = 'Bekle…'; $('exCancel').disabled = true;
+    try {
+      blob = await toStandardMp4(raw, pr => {
+        $('exMsg').textContent = `Paylaşılabilir MP4'e çevriliyor… %${Math.round(pr*100)}`;
+        $('exBar').style.width = Math.round(pr*100) + '%';
+      });
+      ext = 'mp4'; note = 'WhatsApp / Instagram uyumlu';
+    } catch(e){
+      console.warn('MP4 dönüştürme başarısız:', e);
+      note = 'çevrilemedi, ham kayıt — bazı uygulamalar açmayabilir';
+    }
+    $('exCancel').disabled = false;
+    const name = `kurgu-${stamp}.${ext}`;
+    $('exDl').href = URL.createObjectURL(blob); $('exDl').download = name; $('exDl').style.display = 'block';
     $('exDl').dataset.size = blob.size;
-    $('exMsg').textContent = `Hazır: ${name} · ${(blob.size/1048576).toFixed(1)} MB (${mm.ext.toUpperCase()})`;
+    $('exMsg').textContent = `Hazır: ${name} · ${(blob.size/1048576).toFixed(1)} MB (${note})`;
     $('exCancel').textContent = 'Kapat'; $('exBar').style.width = '100%';
   };
   $('exMsg').textContent = 'Video gerçek zamanlı kaydediliyor. Bu sekmeyi açık tut.';
@@ -1163,6 +1178,22 @@ $('btnExport').onclick = () => {
   rec.start(250);
   setTimeout(play, 120);
 };
+// Mediabunny (MPL-2.0) ile standart MP4: https://mediabunny.dev
+let MB = null;
+async function toStandardMp4(blob, onProgress){
+  MB = MB || await import('https://cdn.jsdelivr.net/npm/mediabunny@1.65.2/+esm');
+  const input = new MB.Input({formats: MB.ALL_FORMATS, source: new MB.BlobSource(blob)});
+  const output = new MB.Output({format: new MB.Mp4OutputFormat({fastStart: 'in-memory'}), target: new MB.BufferTarget()});
+  const conv = await MB.Conversion.init({
+    input, output,
+    video: {codec: 'avc', frameRate: 30, quality: MB.QUALITY_HIGH, keyFrameInterval: 2, forceTranscode: true},
+    audio: {codec: 'aac', numberOfChannels: 2, sampleRate: 48000, bitrate: 160000},
+  });
+  if (!conv.isValid) throw new Error('Dönüştürme mümkün değil: ' + conv.discardedTracks.map(d => d.reason).join(', '));
+  conv.onProgress = onProgress;
+  await conv.execute();
+  return new Blob([output.target.buffer], {type: 'video/mp4'});
+}
 function finishExport(){ if (S.exporting && S.exporting.rec.state !== 'inactive') setTimeout(() => S.exporting && S.exporting.rec.stop(), 150); }
 $('exCancel').onclick = () => {
   if (S.exporting){ S.exporting.cancelled = true; stop(); S.exporting.rec.stop(); toast('Dışa aktarma iptal'); }
