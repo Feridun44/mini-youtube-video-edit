@@ -20,7 +20,8 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 
 ## Özellikler
 
-- **Video:** sürükle-bırak yükleme, birden çok klip, kırpma, bölme, sıralama, klip başına ses
+- **Video:** birden çok videoyu ekleyip birleştirme, zaman çizelgesinde sürükleyerek sıralama, kenardan sürükleyerek kesme, bölme, klip başına ses
+- **Geçişler:** yumuşak, kararma, flaş, kaydırma, yakınlaşma (süre ayarlı)
 - **Platformlar:** TikTok · Reels · Shorts (9:16, 1080×1920), YouTube (16:9, 1920×1080), Instagram gönderi (4:5), kare (1:1)
 - **Boşluk doldurma:** bulanık arka plan, kırp ve doldur (sürükleyerek konum seç), yansıma, düz renk bant
 - **Güvenli alan kılavuzu:** TikTok, Reels ve Shorts arayüzünün kapladığı yerleri önizlemede gösterir
