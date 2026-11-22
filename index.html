@@ -81,6 +81,11 @@ footer{border-top:1px solid var(--line);background:var(--panel)}
 .meter{height:6px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin:8px 0 2px}
 .meter div{height:100%;width:0;background:linear-gradient(90deg,#0f9d76 0%,#0f9d76 70%,#e8a33a 85%,#d6334a 100%);transition:width .05s}
 #voWave{width:100%;height:84px;display:block;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.opts button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:1px;padding:7px 9px}
+.opts button b{font-size:12px}
+.opts button small{font-size:10.5px;color:var(--muted);line-height:1.25}
+.opts button.on small{color:inherit;opacity:.85}
 label.chk{display:flex;gap:7px;align-items:center;color:var(--text);margin:5px 0}
 label.chk input{width:auto;flex:0 0 auto}
 #countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font:800 96px system-ui;color:#fff;text-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:none;z-index:4}
@@ -294,17 +299,43 @@ label.chk input{width:auto;flex:0 0 auto}
     </div>
 
     <div class="pane" id="pLook">
-      <h3>Tuval</h3>
-      <label>Boyut</label>
-      <div class="row" id="fmtBtns" style="flex-wrap:wrap">
-        <button data-fmt="9:16" class="on">9:16 Reels</button><button data-fmt="4:5">4:5</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9" hidden>16:9</button>
+      <h3>Platform</h3>
+      <div class="opts" id="fmtBtns">
+        <button data-fmt="9:16" class="on"><b>TikTok · Reels · Shorts</b><small>9:16 · 1080×1920</small></button>
+        <button data-fmt="16:9"><b>YouTube</b><small>16:9 · 1920×1080</small></button>
+        <button data-fmt="4:5"><b>Instagram gönderi</b><small>4:5 · 1080×1350</small></button>
+        <button data-fmt="1:1"><b>Kare</b><small>1:1 · 1080×1080</small></button>
       </div>
-      <label hidden>Klip yerleşimi</label>
-      <div class="row" id="fitBtns" hidden><button data-fit="fill" class="on">Doldur (kırp)</button><button data-fit="fit">Sığdır</button></div>
-      <div hidden><label>Arka plan rengi</label>
+      <h3 style="margin-top:12px">Boşlukları doldur</h3>
+      <p class="hint" style="margin-top:0">Video oranı platforma uymadığında üstte/altta ya da yanlarda kalan boşluk.</p>
+      <div class="opts" id="fitBtns">
+        <button data-fit="blur" class="on"><b>Bulanık arka plan</b><small>Video tam görünür, kalite korunur</small></button>
+        <button data-fit="fill"><b>Kırp ve doldur</b><small>Tam ekran, kenarlar kesilir</small></button>
+        <button data-fit="mirror"><b>Yansıma</b><small>Kenarlar videonun aynasıyla dolar</small></button>
+        <button data-fit="fit"><b>Düz renk</b><small>Klasik bant, istediğin renkte</small></button>
+      </div>
+      <div id="optBlur">
+        <label>Bulanıklık <span id="blurAmtV">60%</span></label>
+        <input type="range" id="blurAmt" min="10" max="100" value="60">
+        <label>Arka planı karart <span id="bgDimV">20%</span></label>
+        <input type="range" id="bgDim" min="0" max="80" value="20">
+      </div>
+      <div id="optColor" style="display:none"><label>Bant rengi</label>
       <input type="color" id="bgColor" value="#000000"></div>
+      <div id="optPan">
+        <p class="hint" id="panHint">Önizlemede videoyu sürükleyerek görünen kısmı seç (seçili klip için).</p>
+        <button id="panReset" style="width:100%">Videoyu ortala</button>
+      </div>
       <label>Yakınlaştırma <span id="zoomV">100%</span></label>
       <input type="range" id="zoom" min="100" max="200" value="100">
+      <h3 style="margin-top:12px">Güvenli alan</h3>
+      <select id="safeZone">
+        <option value="">Kapalı</option>
+        <option value="tiktok">TikTok</option>
+        <option value="reels">Instagram Reels</option>
+        <option value="shorts">YouTube Shorts</option>
+      </select>
+      <p class="hint">Uygulamanın butonları ve açıklaması yazının üstüne gelmesin diye kapalı alanları gösterir. Sadece önizlemede görünür, videoya girmez. Değerler yaklaşıktır.</p>
       <h3 style="margin-top:14px">Renk</h3>
       <label>Parlaklık <span id="brightV">100%</span></label>
       <input type="range" id="bright" min="30" max="200" value="100">
@@ -364,7 +395,7 @@ const FORMATS = {'9:16':[1080,1920],'4:5':[1080,1350],'1:1':[1080,1080],'16:9':[
 
 const S = {
   clips: [], texts: [], vo: null,
-  fmt:'9:16', fit:'fill', bg:'#000000', zoom:1, bright:100, contrast:100, sat:100, master:1, voVol:1,
+  fmt:'9:16', fit:'blur', blurAmt:0.6, bgDim:0.2, safe:'', bg:'#000000', zoom:1, bright:100, contrast:100, sat:100, master:1, voVol:1,
   duck:{on:true, lvl:0.25},
   rank:{on:false, dir:'down', pos:'tl', color:'#2ee6a6', text:'#04140e'},
   sel:null, selText:null, t:0, playing:false, cur:0, exporting:null, pps:60
@@ -535,7 +566,14 @@ function textAt(p){
 let drag = null;
 cv.addEventListener('pointerdown', e => {
   if (S.exporting) return;
-  const p = canvasPt(e), x = textAt(p); if (!x) return;
+  const p = canvasPt(e), x = textAt(p);
+  if (!x){
+    const c = S.clips[S.cur]; if (!c || !c.el.videoWidth) return;
+    const r = videoRect(c, p.W, p.H); if (!r.mx && !r.my) return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    drag = {pan: c, x0: p.x, y0: p.y, px: c.panX||0, py: c.panY||0, mx: r.mx, my: r.my};
+    cv.style.cursor = 'grabbing'; return;
+  }
   e.preventDefault(); cv.setPointerCapture(e.pointerId);
   drag = {x, dx: p.x - p.W*(x.x == null ? 0.5 : x.x), dy: p.y - p.H*x.y};
   if (S.selText !== x.id){ S.selText = x.id; switchTab('R','pText'); refresh(); }
@@ -543,7 +581,17 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   const p = canvasPt(e);
-  if (!drag){ cv.style.cursor = textAt(p) ? 'grab' : ''; return; }
+  if (!drag){
+    let canPan = false; const c = S.clips[S.cur];
+    if (c && c.el.videoWidth){ const r = videoRect(c, p.W, p.H); canPan = r.mx > 0 || r.my > 0; }
+    cv.style.cursor = textAt(p) ? 'grab' : canPan ? 'move' : ''; return;
+  }
+  if (drag.pan){
+    const c = drag.pan;
+    if (drag.mx) c.panX = clamp(drag.px - (p.x - drag.x0)/drag.mx, -1, 1);
+    if (drag.my) c.panY = clamp(drag.py - (p.y - drag.y0)/drag.my, -1, 1);
+    draw(); return;
+  }
   const x = drag.x;
   x.x = clamp((p.x - drag.dx) / p.W, 0.02, 0.98);
   x.y = clamp((p.y - drag.dy) / p.H, 0.02, 0.98);
@@ -569,21 +617,76 @@ function draw(){
   ctx.filter = 'none';
   ctx.fillStyle = S.bg; ctx.fillRect(0,0,W,H);
   const c = S.clips[S.cur];
-  if (c && c.el.readyState >= 2){
-    const vw = c.el.videoWidth, vh = c.el.videoHeight;
-    let sc = S.fit === 'fill' ? Math.max(W/vw, H/vh) : Math.min(W/vw, H/vh);
-    sc *= S.zoom;
-    const dw = vw*sc, dh = vh*sc;
-    ctx.filter = `brightness(${S.bright}%) contrast(${S.contrast}%) saturate(${S.sat}%)`;
-    ctx.drawImage(c.el, (W-dw)/2, (H-dh)/2, dw, dh);
-    ctx.filter = 'none';
-  }
+  if (c && c.el.readyState >= 2) drawVideo(c, W, H);
   if (S.rank.on && c) drawRank(c, W, H);
   for (const x of S.texts){
     const end = x.end == null ? Infinity : x.end;
     if (S.t >= x.start && (S.t < end || (end === Infinity))) drawText(x, W, H);
   }
+  if (S.safe && !S.exporting && !S.fullRes) drawSafe(W, H);
   $('empty').style.display = S.clips.length ? 'none' : 'flex';
+}
+// Videonun tuvaldeki yeri: kırpmada kaplar, diğer modlarda sığar; pan ile kaydırılır
+function videoRect(c, W, H){
+  const vw = c.el.videoWidth || 16, vh = c.el.videoHeight || 9;
+  const sc = (S.fit === 'fill' ? Math.max(W/vw, H/vh) : Math.min(W/vw, H/vh)) * S.zoom;
+  const dw = vw*sc, dh = vh*sc, mx = Math.max(0, (dw - W)/2), my = Math.max(0, (dh - H)/2);
+  return {x: (W-dw)/2 - (c.panX||0)*mx, y: (H-dh)/2 - (c.panY||0)*my, w: dw, h: dh, mx, my};
+}
+const bgCv = document.createElement('canvas'), bgCtx = bgCv.getContext('2d');
+function drawVideo(c, W, H){
+  const look = `brightness(${S.bright}%) contrast(${S.contrast}%) saturate(${S.sat}%)`;
+  const r = videoRect(c, W, H), gaps = r.x > 0.5 || r.y > 0.5 || r.x + r.w < W - 0.5 || r.y + r.h < H - 0.5;
+  if (gaps && S.fit === 'blur'){
+    // küçük tuvale çiz, büyüt: ucuz ve yumuşak bulanıklık (gerçek zamanlı dışa aktarmada da akıcı)
+    const div = 6 + Math.round(S.blurAmt * 26), bw = Math.max(8, Math.round(W/div)), bh = Math.max(8, Math.round(H/div));
+    if (bgCv.width !== bw || bgCv.height !== bh){ bgCv.width = bw; bgCv.height = bh; }
+    const vw = c.el.videoWidth, vh = c.el.videoHeight, cs = Math.max(bw/vw, bh/vh) * 1.1;
+    bgCtx.filter = `blur(${(1 + S.blurAmt*2).toFixed(1)}px) ${look} brightness(${Math.round(100 - S.bgDim*100)}%)`;
+    bgCtx.drawImage(c.el, (bw - vw*cs)/2, (bh - vh*cs)/2, vw*cs, vh*cs);
+    bgCtx.filter = 'none';
+    ctx.drawImage(bgCv, 0, 0, W, H);
+  }
+  if (gaps && S.fit === 'mirror'){
+    ctx.save(); ctx.filter = look + ' brightness(80%)';
+    if (r.y > 0.5){ // üst/alt boşluk: dikey ayna
+      ctx.save(); ctx.translate(0, r.y); ctx.scale(1, -1); ctx.drawImage(c.el, r.x, 0, r.w, r.h); ctx.restore();
+      ctx.save(); ctx.translate(0, r.y + r.h*2); ctx.scale(1, -1); ctx.drawImage(c.el, r.x, 0, r.w, r.h); ctx.restore();
+    }
+    if (r.x > 0.5){ // yan boşluk: yatay ayna
+      ctx.save(); ctx.translate(r.x, 0); ctx.scale(-1, 1); ctx.drawImage(c.el, 0, r.y, r.w, r.h); ctx.restore();
+      ctx.save(); ctx.translate(r.x + r.w*2, 0); ctx.scale(-1, 1); ctx.drawImage(c.el, 0, r.y, r.w, r.h); ctx.restore();
+    }
+    ctx.restore();
+  }
+  ctx.filter = look;
+  ctx.drawImage(c.el, r.x, r.y, r.w, r.h);
+  ctx.filter = 'none';
+  if (gaps && (S.fit === 'blur' || S.fit === 'mirror')){
+    // video kenarına ince gölge: arka plandan ayrışsın
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = W*0.02; ctx.strokeStyle = 'rgba(0,0,0,.01)';
+    ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.restore();
+  }
+}
+// Platform arayüzünün kapladığı yaklaşık alanlar (1080×1920 üzerinden px)
+const SAFE = {
+  tiktok: {name:'TikTok', top:160, bottom:480, left:60, right:150},
+  reels:  {name:'Reels',  top:220, bottom:420, left:60, right:130},
+  shorts: {name:'Shorts', top:190, bottom:400, left:60, right:140},
+};
+function drawSafe(W, H){
+  const z = SAFE[S.safe]; if (!z) return;
+  const kx = W/1080, ky = H/1920;
+  ctx.save();
+  ctx.fillStyle = 'rgba(214,51,74,.28)';
+  ctx.fillRect(0, 0, W, z.top*ky); ctx.fillRect(0, H - z.bottom*ky, W, z.bottom*ky);
+  ctx.fillRect(0, z.top*ky, z.left*kx, H - (z.top + z.bottom)*ky);
+  ctx.fillRect(W - z.right*kx, z.top*ky, z.right*kx, H - (z.top + z.bottom)*ky);
+  ctx.setLineDash([W*0.015, W*0.01]); ctx.lineWidth = W*0.003; ctx.strokeStyle = 'rgba(255,255,255,.9)';
+  ctx.strokeRect(z.left*kx, z.top*ky, W - (z.left + z.right)*kx, H - (z.top + z.bottom)*ky);
+  ctx.setLineDash([]); ctx.font = `700 ${Math.round(W*0.03)}px system-ui, sans-serif`; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(z.name + ' güvenli alan', W/2, z.top*ky/2);
+  ctx.restore();
 }
 function drawRank(c, W, H){
   const n = S.clips.length, idx = S.cur;
@@ -695,6 +798,10 @@ function refresh(){
   const T = total(), [W,H] = FORMATS[S.fmt];
   $('info').textContent = `${S.clips.length} klip · ${fmtT(T)} · ${W}×${H}`;
   cv.style.setProperty('--ar', W + '/' + H);
+  $('optBlur').style.display = S.fit === 'blur' ? 'block' : 'none';
+  $('optColor').style.display = S.fit === 'fit' ? 'block' : 'none';
+  $('optPan').style.display = (S.fit === 'fill' || S.zoom > 1) ? 'block' : 'none';
+  $('safeZone').disabled = S.fmt !== '9:16'; if (S.fmt !== '9:16' && S.safe){ S.safe = ''; $('safeZone').value = ''; }
   $('tlInfo').textContent = `${S.clips.length} klip · ${S.texts.length} yazı`;
   $('btnExport').disabled = !S.clips.length;
   // klip listesi
@@ -916,9 +1023,14 @@ function seg(boxId, attr, key){
     S[key] = b.dataset[attr]; $(boxId).querySelectorAll('button').forEach(o => o.classList.toggle('on', o === b)); refresh(); };
 }
 seg('fmtBtns', 'fmt', 'fmt'); seg('fitBtns', 'fit', 'fit');
+$('blurAmt').oninput = e => { S.blurAmt = e.target.value/100; $('blurAmtV').textContent = e.target.value + '%'; draw(); };
+$('bgDim').oninput = e => { S.bgDim = e.target.value/100; $('bgDimV').textContent = e.target.value + '%'; draw(); };
+$('safeZone').onchange = e => { S.safe = e.target.value; if (S.safe && S.fmt !== '9:16') toast('Güvenli alan 9:16 için; formatı TikTok·Reels·Shorts yap'); draw(); };
+$('panReset').onclick = () => { const c = S.clips[S.cur]; if (!c) return; c.panX = c.panY = 0; draw(); toast('Video ortalandı'); };
 $('bgColor').oninput = e => { S.bg = e.target.value; draw(); };
 function slider(id, key, scale){ $(id).oninput = e => { S[key] = +e.target.value * (scale||1); $(id+'V').textContent = e.target.value + '%'; draw(); }; }
 slider('bright','bright'); slider('contrast','contrast'); slider('sat','sat'); slider('zoom','zoom',0.01);
+$('zoom').addEventListener('change', () => refresh());
 $('lookReset').onclick = () => { for (const k of ['bright','contrast','sat']){ S[k] = 100; $(k).value = 100; $(k+'V').textContent = '100%'; } S.zoom = 1; $('zoom').value = 100; $('zoomV').textContent = '100%'; draw(); toast('Renkler sıfırlandı'); };
 
 // ---------- ses ----------
@@ -1141,7 +1253,7 @@ $('btnExport').onclick = () => {
   ensureAudio(); stop();
   const stream = cv.captureStream(30);
   recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-  const rec = new MediaRecorder(stream, {mimeType: mm.m, videoBitsPerSecond: 8_000_000});
+  const rec = new MediaRecorder(stream, {mimeType: mm.m, videoBitsPerSecond: S.fmt === '16:9' ? 20_000_000 : 16_000_000});
   const chunks = [];
   rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   S.exporting = {rec, chunks, ext: mm.ext, cancelled: false};
