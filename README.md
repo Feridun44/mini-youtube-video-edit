@@ -24,7 +24,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Platformlar:** TikTok · Reels · Shorts (9:16, 1080×1920), YouTube (16:9, 1920×1080), Instagram gönderi (4:5), kare (1:1)
 - **Boşluk doldurma:** bulanık arka plan, kırp ve doldur (sürükleyerek konum seç), yansıma, düz renk bant
 - **Güvenli alan kılavuzu:** TikTok, Reels ve Shorts arayüzünün kapladığı yerleri önizlemede gösterir
-- **Yazı:** font, boyut, renk, kenarlık, önizlemede sürükleyerek taşıma, her kelimeye ayrı renk (kelimeyi seç → renk seç → "Seçili kelimeyi renklendir")
+- **Yazı:** font, boyut, renk, kenarlık, önizlemede sürükleyerek taşıma, yazı arka planı (kutu, satır, hap, kelime, bant, parıltı, çerçeve, eğik; renk/saydamlık/köşe ayarlı), her kelimeye ayrı renk (kelimeyi seç → renk seç → "Seçili kelimeyi renklendir")
 - **Görüntü:** parlaklık, kontrast, doygunluk, yakınlaştırma
 - **Seslendirme:** geri sayımlı mikrofon kaydı, seviye göstergesi, dalga görünümü, kırpma, kaydırma, açılış/kapanış geçişi
 - **Ses iyileştirme:** uğultu temizleme, gürültü kapısı, EQ, kompresör, normalize, önce/sonra dinleme
