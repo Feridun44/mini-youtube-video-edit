@@ -5,114 +5,168 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kurgu Masası</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Montserrat:wght@500;800&family=Poppins:wght@700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Anton&family=Bebas+Neue&family=Montserrat:wght@500;800&family=Poppins:wght@700&display=swap">
 <style>
+/* Kurgu Masası — açık, sade arayüz.
+   Renk: soğuk sis zemin, beyaz yüzey, kobalt ana eylem, kehribar oynatma çizgisi, kayıt kırmızısı. */
 :root{
-  --bg:#f4f6f8; --panel:#ffffff; --panel2:#f1f3f6; --line:#dfe3e8; --text:#1c2126; --muted:#68727d;
-  --acc:#0f9d76; --acc2:#0c8664; --warn:#c77700; --danger:#d6334a; --clip:#4a8fd4; --clipSel:#2f74c0; --txtClip:#8b5cd6;
-  --field:#ffffff; --onAcc:#ffffff;
+  --bg:#eef0f4; --panel:#ffffff; --panel2:#f5f6f9; --line:#e2e5eb; --line2:#d3d7df;
+  --text:#171a21; --muted:#6b7180; --acc:#3a5bff; --acc2:#2c48e0; --accSoft:#eef1ff;
+  --warn:#ff9f1c; --danger:#e5484d; --clip:#5b78ff; --clipSel:#3a5bff; --txtClip:#8b5cf6;
+  --field:#ffffff; --onAcc:#ffffff; --r:10px; --rs:8px;
+  --shadow:0 1px 2px rgba(23,26,33,.05), 0 2px 8px rgba(23,26,33,.04);
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-button,select,input{font:inherit;color:inherit}
-button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 10px;cursor:pointer}
-button:hover:not(:disabled){border-color:var(--acc)}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:13.5px/1.45 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* Butonlar: ikincil (varsayılan), ana, sessiz, tehlike */
+button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;
+  background:var(--panel);border:1px solid var(--line2);border-radius:var(--rs);padding:6px 12px;
+  font-weight:600;font-size:13px;cursor:pointer;box-shadow:0 1px 1px rgba(23,26,33,.04);
+  transition:background .12s,border-color .12s,box-shadow .12s,transform .06s}
+button:hover:not(:disabled){background:var(--panel2);border-color:#c4c9d3}
+button:active:not(:disabled){transform:translateY(1px)}
 button:disabled{opacity:.4;cursor:not-allowed}
-button.primary{background:var(--acc);color:var(--onAcc);border-color:var(--acc);font-weight:700}
-button.danger{border-color:#f1c3ca;color:var(--danger)}
-button.on{background:var(--acc2);color:var(--onAcc);border-color:var(--acc2)}
-input[type=text],input[type=number],select,textarea{background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 7px;width:100%}
-textarea{resize:vertical;min-height:54px}
-input[type=range]{width:100%;accent-color:var(--acc)}
-input[type=color]{width:38px;height:28px;border:1px solid var(--line);border-radius:6px;background:none;padding:1px}
-label{display:block;color:var(--muted);font-size:12px;margin:8px 0 3px}
+button.primary{background:var(--acc);color:var(--onAcc);border-color:var(--acc);box-shadow:0 1px 2px rgba(58,91,255,.35)}
+button.primary:hover:not(:disabled){background:var(--acc2);border-color:var(--acc2)}
+button.ghost{background:transparent;border-color:transparent;box-shadow:none;color:var(--muted)}
+button.ghost:hover:not(:disabled){background:var(--panel2);color:var(--text)}
+button.danger{color:var(--danger);border-color:#f3c9cb}
+button.danger:hover:not(:disabled){background:#fff4f4;border-color:var(--danger)}
+button.on{background:var(--accSoft);color:var(--acc2);border-color:var(--acc)}
+
+input[type=text],input[type=number],select,textarea{background:var(--field);color:var(--text);border:1px solid var(--line2);
+  border-radius:var(--rs);padding:7px 9px;width:100%;min-height:34px}
+input[type=text]:focus,input[type=number]:focus,select:focus,textarea:focus{border-color:var(--acc);outline:none;box-shadow:0 0 0 3px var(--accSoft)}
+textarea{resize:vertical;min-height:64px;font-weight:600}
+input[type=range]{width:100%;accent-color:var(--acc);height:18px}
+input[type=color]{width:40px;height:34px;border:1px solid var(--line2);border-radius:var(--rs);background:var(--panel);padding:3px;cursor:pointer}
+input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
+label{display:block;color:var(--muted);font-size:12.5px;margin:10px 0 4px}
+label span{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 .row{display:flex;gap:8px;align-items:center}
 .row>*{flex:1}
 .row>.auto{flex:0 0 auto}
-h3{margin:4px 0 6px;font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
-.hint{color:var(--muted);font-size:12px;margin:4px 0}
-.card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:10px}
+h3{margin:2px 0 8px;font-size:13.5px;font-weight:700;color:var(--text)}
+.hint{color:var(--muted);font-size:12px;margin:6px 0}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:12px}
 
+/* Yerleşim */
 #app{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);height:100vh}
-header{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line)}
-.logo{font-weight:800;letter-spacing:.02em}
-.logo span{color:var(--acc)}
-#info{flex:1;text-align:center;color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12px}
-main{display:grid;grid-template-columns:300px minmax(0,1fr) 300px;gap:10px;padding:10px;min-height:0}
-.panel{background:var(--panel);box-shadow:0 1px 3px rgba(20,30,40,.06);border:1px solid var(--line);border-radius:11px;display:flex;flex-direction:column;min-height:0}
-.tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;padding:5px 4px;font-size:12px}
-.tabs button.active{background:var(--acc);color:var(--onAcc);border-color:var(--acc);font-weight:700}
-.pane{padding:10px;overflow:auto;flex:1;display:none}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.logo{font-weight:800;font-size:15px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;margin-right:auto}
+.logo:before{content:"";width:10px;height:10px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 3px #fde4e5}
+.logo span{color:var(--muted);font-weight:600}
+#info{flex:1;text-align:center;color:var(--muted);font-size:12px}
+main{display:grid;grid-template-columns:304px minmax(0,1fr) 304px;gap:12px;padding:12px;min-height:0}
+.panel{background:var(--panel);box-shadow:var(--shadow);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:0}
+
+/* Sekmeler: bölmeli düğme */
+.tabs{display:flex;gap:2px;margin:10px 10px 0;padding:3px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r)}
+.tabs button{flex:1;min-height:30px;padding:4px 6px;font-size:12.5px;background:transparent;border-color:transparent;box-shadow:none;color:var(--muted)}
+.tabs button:hover:not(:disabled){background:transparent;color:var(--text)}
+.tabs button.active{background:var(--panel);color:var(--text);border-color:var(--line);box-shadow:0 1px 2px rgba(23,26,33,.08)}
+.pane{padding:14px;overflow:auto;flex:1;display:none}
 .pane.active{display:block}
 
-#stage{display:flex;flex-direction:column;min-height:0}
-#canvasWrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:10px;position:relative}
-#cv{touch-action:none;aspect-ratio:var(--ar,9/16);height:100%;width:auto;max-width:100%;max-height:calc(100vh - 260px);background:#000;border-radius:8px;box-shadow:0 0 0 1px var(--line)}
-#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);pointer-events:none;padding:30px}
-#transport{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--line);flex-wrap:wrap}
-#seek{flex:1;min-width:120px}
-.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+/* Sahne: önizleme kesim matının üstünde */
+#stage{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#canvasWrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:16px;position:relative;
+  background:#f7f8fb radial-gradient(circle, #d9dde5 1px, transparent 1.2px) 0 0/18px 18px}
+#cv{touch-action:none;aspect-ratio:var(--ar,9/16);height:100%;width:auto;max-width:100%;max-height:calc(100vh - 290px);
+  background:#0f1115;border-radius:12px;box-shadow:0 10px 30px rgba(23,26,33,.18),0 0 0 1px rgba(23,26,33,.06)}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#c9ced8;pointer-events:none;padding:30px;font-weight:600}
+#transport{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:10px 14px 12px;border-top:1px solid var(--line)}
+#seek{grid-column:1/-1;width:100%}
+#tTime{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;font-weight:600}
+.tctl{display:flex;align-items:center;gap:6px}
+.tctl button{min-width:38px;padding:6px 8px}
+#tPlay{width:46px;height:46px;min-width:46px;border-radius:50%;padding:0;font-size:16px}
+#tSnap{justify-self:end}
+.mono{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted)}
 
-#drop{border:1.5px dashed var(--line);border-radius:9px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
-#drop.over{border-color:var(--acc);color:var(--acc)}
-.list{display:flex;flex-direction:column;gap:4px;margin-top:8px}
-.item{display:flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 8px;cursor:pointer}
-.item.sel{border-color:var(--acc)}
-.item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#drop{border:1.5px dashed var(--line2);border-radius:var(--r);padding:22px 14px;text-align:center;color:var(--muted);cursor:pointer;background:var(--panel2);transition:border-color .12s,background .12s}
+#drop:hover,#drop.over{border-color:var(--acc);color:var(--acc2);background:var(--accSoft)}
+#drop b{color:var(--acc)}
+.list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.item{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--rs);padding:8px 10px;cursor:pointer}
+.item:hover{border-color:var(--line2)}
+.item.sel{border-color:var(--acc);background:var(--accSoft)}
+.item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 
+/* Zaman çizelgesi */
 footer{border-top:1px solid var(--line);background:var(--panel)}
-#tlbar{display:flex;gap:6px;align-items:center;padding:6px 10px;flex-wrap:wrap}
+#tlbar{display:flex;gap:6px;align-items:center;padding:8px 14px;flex-wrap:wrap}
+#tlbar>b{font-size:13.5px;margin-right:8px}
+#tlbar button{min-height:30px;padding:4px 10px;font-size:12.5px}
 #tlbar .sp{flex:1}
-#tlScroll{overflow-x:auto;padding:0 10px 10px}
+#tlScroll{overflow-x:auto;padding:0 14px 12px}
 #tl{position:relative;min-width:100%;user-select:none}
-#ruler{height:18px;position:relative;color:var(--muted);font-size:10px;cursor:pointer}
-#ruler i{position:absolute;top:0;height:6px;border-left:1px solid var(--line)}
-#ruler b{position:absolute;top:5px;font-weight:400;transform:translateX(2px)}
-.track{position:relative;height:46px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;margin-top:4px;cursor:pointer}
-.track.small{height:26px}
-.blk{position:absolute;top:3px;bottom:3px;background:var(--clip);border-radius:5px;overflow:hidden;padding:3px 6px;font-size:11px;white-space:nowrap;border:1.5px solid transparent}
-.blk.sel{border-color:#fff;background:var(--clipSel)}
+#ruler{height:18px;position:relative;color:var(--muted);font-size:10.5px;cursor:pointer;font-variant-numeric:tabular-nums}
+#ruler i{position:absolute;top:0;height:6px;border-left:1px solid var(--line2)}
+#ruler b{position:absolute;top:5px;font-weight:500;transform:translateX(3px)}
+.track{position:relative;height:46px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--rs);margin-top:5px;cursor:pointer}
+.track.small{height:28px}
+.blk{position:absolute;top:3px;bottom:3px;background:var(--clip);color:#fff;border-radius:6px;overflow:hidden;padding:3px 7px;font-size:11px;font-weight:600;white-space:nowrap;border:2px solid transparent}
+.blk.sel{border-color:#171a21;background:var(--clipSel)}
 .blk.t{background:var(--txtClip)}
-.blk small{display:block;opacity:.75}
-#trVO .blk{background:#e8833a;padding:0;cursor:grab;touch-action:none}
+.blk small{display:block;opacity:.8;font-weight:500}
+#trVO .blk{background:#f08a3c;padding:0;cursor:grab;touch-action:none}
 #trVO .blk canvas{position:absolute;inset:0;width:100%;height:100%}
-#trVO .blk span{position:relative;padding:2px 6px;font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
-.meter{height:6px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin:8px 0 2px}
-.meter div{height:100%;width:0;background:linear-gradient(90deg,#0f9d76 0%,#0f9d76 70%,#e8a33a 85%,#d6334a 100%);transition:width .05s}
-#voWave{width:100%;height:84px;display:block;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}
-.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.opts button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:1px;padding:7px 9px}
-.opts button b{font-size:12px}
-.opts button small{font-size:10.5px;color:var(--muted);line-height:1.25}
-.opts3{grid-template-columns:1fr 1fr 1fr}
-.opts3 button{padding:6px 7px}
-.opts button.on small{color:inherit;opacity:.85}
-label.chk{display:flex;gap:7px;align-items:center;color:var(--text);margin:5px 0}
-label.chk input{width:auto;flex:0 0 auto}
-#countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font:800 96px system-ui;color:#fff;text-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:none;z-index:4}
-#recDot{position:absolute;top:18px;left:50%;transform:translateX(-50%);display:none;background:#d6334a;color:#fff;font-weight:700;font-size:12px;padding:4px 10px;border-radius:20px;z-index:4}
+#trVO .blk span{position:relative;padding:3px 7px;font-size:10.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3)}
 #ph{position:absolute;top:0;bottom:0;width:2px;background:var(--warn);pointer-events:none;z-index:5}
 #ph:before{content:"";position:absolute;top:0;left:-5px;border:6px solid transparent;border-top-color:var(--warn)}
 
-#exportBox{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
+.meter{height:6px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin:10px 0 2px}
+.meter div{height:100%;width:0;background:linear-gradient(90deg,#2fb67a 0%,#2fb67a 70%,#ffb020 85%,var(--danger) 100%);transition:width .05s}
+#voWave{width:100%;height:84px;display:block;margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:var(--rs);cursor:pointer}
+
+/* Seçenek kartları */
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.opts button{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;text-align:left;gap:2px;padding:9px 10px;min-height:0;box-shadow:none}
+.opts button b{font-size:12.5px;font-weight:700}
+.opts button small{font-size:11px;color:var(--muted);line-height:1.3;font-weight:500}
+.opts button.on{background:var(--accSoft);border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.opts button.on b{color:var(--acc2)}
+.opts3{grid-template-columns:1fr 1fr 1fr}
+.opts3 button{padding:7px 8px}
+.opts3 button small{font-size:10.5px}
+label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:7px 0;font-size:13px}
+label.chk input{width:16px;flex:0 0 auto}
+
+#countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font:800 104px "Plus Jakarta Sans",system-ui;color:#fff;text-shadow:0 6px 24px rgba(0,0,0,.5);pointer-events:none;z-index:4}
+#recDot{position:absolute;top:24px;left:50%;transform:translateX(-50%);display:none;background:var(--danger);color:#fff;font-weight:700;font-size:12px;padding:5px 12px;border-radius:20px;z-index:4}
+
+#exportBox{position:fixed;inset:0;background:rgba(23,26,33,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:50}
 #exportBox.show{display:flex}
-#exportBox .card{width:min(420px,92vw);padding:18px}
-.bar{height:8px;background:var(--panel2);border-radius:5px;overflow:hidden;margin:10px 0}
-.bar div{height:100%;width:0;background:var(--acc)}
-#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1c2126;color:#fff;border:1px solid var(--acc);padding:8px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+#exportBox .card{width:min(440px,92vw);padding:20px;background:var(--panel);box-shadow:0 20px 50px rgba(23,26,33,.25)}
+.bar{height:8px;background:var(--panel2);border-radius:5px;overflow:hidden;margin:12px 0}
+.bar div{height:100%;width:0;background:var(--acc);transition:width .2s}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#171a21;color:#fff;padding:9px 16px;border-radius:999px;font-weight:600;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;box-shadow:0 6px 20px rgba(23,26,33,.25)}
 #toast.show{opacity:1}
 #hiddenMedia{position:fixed;left:-10px;top:-10px;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 @media (max-width:980px){
   #app{height:auto;min-height:100vh}
-  main{grid-template-columns:minmax(0,1fr);padding:8px 16px}
+  main{grid-template-columns:minmax(0,1fr);padding:10px 16px}
   #stage{order:-1}
   #canvasWrap{flex:none;height:auto}
   #cv{height:min(52vh,520px);max-height:none}
   .pane{max-height:none}
-  header{flex-wrap:wrap;padding:8px 16px}
+  header{flex-wrap:wrap;padding:10px 16px}
   #info{order:3;flex-basis:100%;text-align:left}
+  #tlScroll,#tlbar{padding-left:16px;padding-right:16px}
+}
+@media (max-width:520px){
+  #transport{grid-template-columns:1fr auto}
+  #tTime{grid-column:1/-1;text-align:center}
+  #tSnap{grid-column:1/-1;justify-self:center}
+  .opts3{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -121,8 +175,8 @@ label.chk input{width:auto;flex:0 0 auto}
 <header>
   <div class="logo">Kurgu<span>Masası</span></div>
   <div id="info" hidden>0 klip · 0:00 · 1080×1920</div>
-  <button id="btnReset" class="danger" title="Her şeyi temizle">Sıfırla</button>
-  <button id="btnExport" class="primary" disabled>Dışa aktar</button>
+  <button id="btnReset" class="ghost" title="Her şeyi temizle">Sıfırla</button>
+  <button id="btnExport" class="primary" disabled>⤓ Dışa aktar</button>
 </header>
 
 <main>
@@ -235,14 +289,16 @@ label.chk input{width:auto;flex:0 0 auto}
       <div id="empty">Video yükle, zaman çizelgesine eklensin.<br>Sonra yazı, filtre ve ses ekle.</div>
     </div>
     <div id="transport">
-      <button id="tStart" title="Başa dön">⏮</button>
-      <button id="tBack" title="1 sn geri">−1s</button>
-      <button id="tPlay" class="primary" title="Oynat / duraklat (Boşluk)">▶ Oynat</button>
-      <button id="tFwd" title="1 sn ileri">+1s</button>
-      <button id="tEnd" title="Sona git">⏭</button>
-      <span class="mono" id="tTime">0:00.00 / 0:00.00</span>
-      <input type="range" id="seek" min="0" max="1000" value="0">
-      <button id="tSnap" title="Bu kareyi PNG indir">Kare PNG</button>
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Oynatma konumu">
+      <span id="tTime">0:00.00 / 0:00.00</span>
+      <div class="tctl">
+        <button id="tStart" class="ghost" title="Başa dön" aria-label="Başa dön">⏮</button>
+        <button id="tBack" class="ghost" title="1 sn geri">−1s</button>
+        <button id="tPlay" class="primary" title="Oynat / duraklat (Boşluk)" aria-label="Oynat">▶</button>
+        <button id="tFwd" class="ghost" title="1 sn ileri">+1s</button>
+        <button id="tEnd" class="ghost" title="Sona git" aria-label="Sona git">⏭</button>
+      </div>
+      <button id="tSnap" class="ghost" title="Bu kareyi PNG olarak indir">Kareyi kaydet</button>
     </div>
   </section>
 
@@ -260,7 +316,7 @@ label.chk input{width:auto;flex:0 0 auto}
         <textarea id="txText"></textarea>
         <div class="row" style="margin-top:6px;align-items:center">
           <input type="color" id="txHl" title="Kelime rengi" style="flex:0 0 auto">
-          <button id="txHlBtn" title="Metinde seçtiğin kelimeleri soldaki renge boya">Seçili kelimeyi renklendir</button>
+          <button id="txHlBtn" title="Metinde seçtiğin kelimeleri soldaki renge boya">Seçileni renklendir</button>
           <button id="txHlClear" title="Bu yazıdaki tüm kelime renklerini kaldır" style="flex:0 0 auto">Temizle</button>
         </div>
         <p class="hint">Renk seç, kelimeyi seç, butona bas. Her kelime farklı renk olabilir. Aynı renkle tekrar basarsan renk kalkar.</p>
@@ -383,12 +439,12 @@ label.chk input{width:auto;flex:0 0 auto}
   <div id="tlbar">
     <b style="margin-right:6px">Zaman çizelgesi</b>
     <button id="bSplit" title="Oynatma çubuğundan böl (S)">✂ Böl</button>
-    <button id="bDel" title="Seçili klibi sil (Delete)">Sil</button>
-    <button id="bLeft" title="Seçili klibi sola taşı">◀ Sola</button>
-    <button id="bRight" title="Seçili klibi sağa taşı">Sağa ▶</button>
+    <button id="bLeft" title="Seçili klibi sola taşı">← Sola</button>
+    <button id="bRight" title="Seçili klibi sağa taşı">Sağa →</button>
+    <button id="bDel" class="danger" title="Seçili klibi sil (Delete)">Sil</button>
     <button id="bDup" title="Seçili klibi çoğalt" hidden>Çoğalt</button>
     <span class="sp"></span>
-    <span class="hint" id="tlInfo">0 klip</span>
+    <span class="mono" id="tlInfo">0 klip</span>
     <label style="margin:0 0 0 8px" hidden>Yakınlık</label>
     <input type="range" id="tlZoom" min="10" max="200" value="60" style="width:110px" hidden>
   </div>
@@ -869,7 +925,7 @@ function updTime(){
   $('ph').style.left = (S.t * S.pps) + 'px';
 }
 function updTransport(){
-  $('tPlay').textContent = S.playing ? '❚❚ Duraklat' : '▶ Oynat';
+  $('tPlay').textContent = S.playing ? '❚❚' : '▶'; $('tPlay').setAttribute('aria-label', S.playing ? 'Duraklat' : 'Oynat');
 }
 function refresh(){
   const T = total(), [W,H] = FORMATS[S.fmt];
