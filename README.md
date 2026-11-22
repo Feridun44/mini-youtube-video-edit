@@ -24,6 +24,9 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Fotoğraf:** fotoğrafı klip olarak ekleme (süre ayarı, yavaş yakınlaşma) ya da videonun üstüne görsel katmanı (logo, çıkartma; boyut, saydamlık, köşe, gölge, giriş/çıkış animasyonu)
 - **Zaman çizelgesi:** yazı ve görsel bloklarını sürükleyerek kaydırma, kenarlarından uzatma/kısaltma; klip sınırlarına ve oynatma çizgisine yapışma; cetvelde sürükleyerek sarma; yakınlaştırma (Cmd/Ctrl + tekerlek, − +, Sığdır)
 - **Geçişler:** yumuşak, kararma, flaş, kaydırma, yakınlaşma, bulanık, ışık sızması, whip pan, zoom vuruşu, dönme, glitch, sarsıntı (süre ayarlı; her klibe ayrı geçiş seçilebilir)
+- **Kamera hareketi:** klip başına yakınlaş, uzaklaş, zoom vuruşu, sola/sağa kay, el kamerası, titreme; tüm kliplere uygulama
+- **Efektler:** film greni, VHS (tarama çizgileri, PLAY yazısı, sayaç), RGB kayması, sinema bantları, ilerleme çubuğu (üstte/altta, renk seçimi)
+- **Sessiz yerleri kes:** konuşma videolarında uzun duraklamaları otomatik çıkarır (jump cut)
 - **Hazır edit stilleri:** Slow edit, Velocity, Sinematik — tek tıkla tüm kliplere hız, geçiş ve renk uygular
 - **Platformlar:** TikTok · Reels · Shorts (9:16, 1080×1920), YouTube (16:9, 1920×1080), Instagram gönderi (4:5), kare (1:1)
 - **Boşluk doldurma:** bulanık arka plan, kırp ve doldur (sürükleyerek konum seç), yansıma, düz renk bant
