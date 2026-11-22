@@ -61,6 +61,8 @@ header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var
 .logo{font-weight:800;font-size:15px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;margin-right:auto}
 .logo:before{content:"";width:10px;height:10px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 3px #fde4e5}
 .logo span{color:var(--muted);font-weight:600}
+#saveState{color:var(--muted);font-size:12px;margin-right:6px}
+#btnUndo,#btnRedo{min-width:36px;font-size:16px;padding:4px 8px}
 #info{flex:1;text-align:center;color:var(--muted);font-size:12px}
 main{display:grid;grid-template-columns:304px minmax(0,1fr) 304px;gap:12px;padding:12px;min-height:0}
 .panel{background:var(--panel);box-shadow:var(--shadow);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:0}
@@ -175,6 +177,9 @@ label.chk input{width:16px;flex:0 0 auto}
 <header>
   <div class="logo">Kurgu<span>Masası</span></div>
   <div id="info" hidden>0 klip · 0:00 · 1080×1920</div>
+  <span id="saveState" class="mono" title="Çalışman bu tarayıcıda otomatik kaydedilir"></span>
+  <button id="btnUndo" class="ghost" title="Geri al (Ctrl/Cmd+Z)" aria-label="Geri al" disabled>↶</button>
+  <button id="btnRedo" class="ghost" title="Yinele (Ctrl/Cmd+Shift+Z)" aria-label="Yinele" disabled>↷</button>
   <button id="btnReset" class="ghost" title="Her şeyi temizle">Sıfırla</button>
   <button id="btnExport" class="primary" disabled>⤓ Dışa aktar</button>
 </header>
@@ -539,21 +544,32 @@ function loadMeta(el){
     el.addEventListener('error', () => rej(new Error('Dosya okunamadı')), {once:true});
   });
 }
+// Yüklenen her dosya bir kez "medya" olarak tutulur; klipler (bölünmüş parçalar dahil) ona mid ile bağlanır.
+const MEDIA = {}, CLIPS = {}, VOS = {};
+async function loadMedia(blob, name, mid){
+  const el = document.createElement('video');
+  el.src = URL.createObjectURL(blob); el.preload = 'auto'; el.playsInline = true; el.crossOrigin = 'anonymous';
+  $('hiddenMedia').appendChild(el);
+  try {
+    const d = await loadMeta(el);
+    el.addEventListener('seeked', draw);
+    el.addEventListener('loadeddata', draw);
+    wireEl(el);
+    mid = mid || uid++;
+    MEDIA[mid] = {mid, el, dur: d, name};
+    return MEDIA[mid];
+  } catch(e){ el.remove(); throw e; }
+}
 async function addVideoFiles(files){
   let n = 0;
   for (const f of files){
     if (!f.type.startsWith('video/') && !/\.(mp4|mov|webm|m4v|mkv)$/i.test(f.name)) { toast(f.name + ' video değil'); continue; }
-    const el = document.createElement('video');
-    el.src = URL.createObjectURL(f); el.preload = 'auto'; el.playsInline = true; el.crossOrigin = 'anonymous';
-    $('hiddenMedia').appendChild(el);
     try {
-      const d = await loadMeta(el);
-      el.addEventListener('seeked', draw);
-      el.addEventListener('loadeddata', draw);
-      wireEl(el);
-      const c = {id: uid++, name: f.name, el, dur: d, in: 0, out: d, vol: 1, muted: false, label: ''};
-      S.clips.push(c); S.sel = c.id; n++;
-    } catch(e){ toast(f.name + ': ' + e.message); el.remove(); }
+      const m = await loadMedia(f, f.name);
+      store.put('m:' + m.mid, f);
+      const c = {id: uid++, mid: m.mid, name: f.name, el: m.el, dur: m.dur, in: 0, out: m.dur, vol: 1, muted: false, label: ''};
+      CLIPS[c.id] = c; S.clips.push(c); S.sel = c.id; n++;
+    } catch(e){ toast(f.name + ': ' + e.message); }
   }
   if (n){ toast(n + ' klip eklendi'); seek(S.t); }
   refresh();
@@ -1084,8 +1100,7 @@ $('bSplit').onclick = () => {
   S.clips.splice(i+1, 0, n); S.sel = n.id; toast('Klip bölündü'); refresh();
 };
 $('bDel').onclick = () => withSel((c, i) => {
-  stop(); S.clips.splice(i, 1);
-  if (!S.clips.some(o => o.el === c.el)) { c.el.pause(); c.el.remove(); }
+  stop(); S.clips.splice(i, 1); c.el.pause(); // öğe geri al için saklanır
   S.sel = S.clips[Math.min(i, S.clips.length-1)]?.id ?? null; seek(Math.min(S.t, total())); toast('Klip silindi');
 });
 $('bLeft').onclick = () => withSel((c, i) => { if (i === 0) return; S.clips.splice(i,1); S.clips.splice(i-1,0,c); seek(offsets()[i-1]); });
@@ -1277,16 +1292,20 @@ async function renderVO(){
 let rvT = 0;
 const rerender = () => { clearTimeout(rvT); rvT = setTimeout(() => renderVO().catch(e => toast('Ses işlenemedi: ' + e.message)), 250); };
 
-async function setVO(blobOrFile, name, offset){
+async function setVO(blobOrFile, name, offset, opts){
   ensureAudio();
   let raw;
   try { raw = await AC.decodeAudioData(await blobOrFile.arrayBuffer()); }
   catch(e){ return toast('Ses okunamadı'); }
-  if (S.vo && S.vo.el){ S.vo.el.pause(); S.vo.el.remove(); }
-  S.vo = {name, raw, el:null, dur: raw.duration, in:0, out: raw.duration, offset: offset || 0, fadeIn:0, fadeOut:0, peaks:null, rawPeaks: peaksOf(raw, 1200)};
+  if (S.vo && S.vo.el) S.vo.el.pause();
+  const vid = opts && opts.vid || uid++;
+  S.vo = {vid, name, raw, el:null, dur: raw.duration, in:0, out: raw.duration, offset: offset || 0, fadeIn:0, fadeOut:0, peaks:null, rawPeaks: peaksOf(raw, 1200)};
+  VOS[vid] = S.vo;
+  if (!(opts && opts.restoring)) store.put('v:' + vid, blobOrFile);
+  if (opts && opts.props) Object.assign(S.vo, opts.props);
   abOn = false; $('fxAB').classList.remove('on'); $('fxAB').textContent = 'Orijinali dinle';
   await renderVO();
-  toast('Seslendirme eklendi');
+  if (!(opts && opts.restoring)) toast('Seslendirme eklendi');
 }
 function refreshVO(){
   const v = S.vo;
@@ -1325,7 +1344,7 @@ FX.forEach(id => $(id).onchange = () => { if (abOn){ abOn = false; $('fxAB').cla
 $('fxAB').onclick = () => { abOn = !abOn; $('fxAB').classList.toggle('on', abOn); $('fxAB').textContent = abOn ? 'İyileştirilmişe dön' : 'Orijinali dinle'; rerender(); };
 $('voUpload').onclick = () => $('fileAudio').click();
 $('fileAudio').onchange = e => { const f = e.target.files[0]; if (f) setVO(f, f.name, S.t); e.target.value = ''; };
-$('voRemove').onclick = () => { if (!S.vo) return; S.vo.el && (S.vo.el.pause(), S.vo.el.remove()); S.vo = null; refresh(); toast('Seslendirme kaldırıldı'); };
+$('voRemove').onclick = () => { if (!S.vo) return; S.vo.el && S.vo.el.pause(); S.vo = null; refresh(); toast('Seslendirme kaldırıldı'); };
 
 // zaman çizelgesinde seslendirmeyi sürükle
 $('trVO').addEventListener('pointerdown', e => {
@@ -1465,11 +1484,17 @@ $('btnReset').onclick = () => {
   if (Date.now() - resetArm > 2500){ resetArm = Date.now(); $('btnReset').textContent = 'Emin misin?'; setTimeout(()=>$('btnReset').textContent='Sıfırla', 2500); return; }
   stop(); S.clips.forEach(c => c.el.remove()); if (S.vo) S.vo.el.remove();
   Object.assign(S, {clips:[], texts:[], vo:null, sel:null, selText:null, t:0, cur:0});
+  for (const o of [MEDIA, CLIPS, VOS]) for (const k in o) delete o[k];
+  store.clear(); hist.length = 0; hIdx = -1; lastSaved = '';
   $('btnReset').textContent = 'Sıfırla'; resetArm = 0; refresh(); toast('Proje sıfırlandı');
 };
 
 // ---------- klavye ----------
 document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z') && !e.target.matches('input[type=text],input[type=number],textarea')){
+    e.preventDefault(); (e.shiftKey ? redo : undo)(); return;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'y' && !e.target.matches('input[type=text],input[type=number],textarea')){ e.preventDefault(); redo(); return; }
   if (e.target.matches('input,textarea,select')) return;
   if (e.code === 'Space'){ e.preventDefault(); toggle(); }
   else if (e.key === 's' || e.key === 'S') $('bSplit').click();
@@ -1478,8 +1503,131 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'ArrowRight') seek(S.t + (e.shiftKey ? 1 : 1/30));
 });
 
+// ---------- kayıt deposu (IndexedDB) ----------
+const store = (() => {
+  let dbp = null, broken = false;
+  const db = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('kurgu-masasi', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const tx = (mode, fn) => db().then(d => new Promise((res, rej) => {
+    const t = d.transaction('kv', mode), st = t.objectStore('kv'); const out = fn(st);
+    t.oncomplete = () => res(out && out.result); t.onerror = t.onabort = () => rej(t.error);
+  }));
+  const fail = e => { if (!broken){ broken = true; toast('Otomatik kayıt yapılamadı: tarayıcı deposu dolu ya da kapalı'); } console.warn(e); };
+  return {
+    put: (k, v) => tx('readwrite', st => st.put(v, k)).catch(fail),
+    get: k => tx('readonly', st => st.get(k)).catch(() => undefined),
+    keys: () => tx('readonly', st => st.getAllKeys()).catch(() => []),
+    del: k => tx('readwrite', st => st.delete(k)).catch(() => {}),
+    clear: () => tx('readwrite', st => st.clear()).catch(() => {}),
+  };
+})();
+
+// ---------- proje durumu: kaydet / geri yükle / geri al ----------
+const LOOK = ['fmt','fit','blurAmt','bgDim','safe','bg','zoom','bright','contrast','sat','master','voVol'];
+function snapshot(){
+  const o = {v:1};
+  for (const k of LOOK) o[k] = S[k];
+  o.duck = {...S.duck};
+  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0}; });
+  o.texts = S.texts.map(({_bb, ...x}) => x);
+  o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
+  o.fx = Object.fromEntries(FX.map(id => [id, $(id).checked]));
+  return JSON.stringify(o);
+}
+function setRange(id, val, txt){ const e = $(id); if (!e) return; e.value = val; const l = $(id+'V'); if (l) l.textContent = txt; }
+function syncControls(){
+  $('fmtBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.fmt === S.fmt));
+  $('fitBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.fit === S.fit));
+  setRange('blurAmt', Math.round(S.blurAmt*100), Math.round(S.blurAmt*100)+'%');
+  setRange('bgDim', Math.round(S.bgDim*100), Math.round(S.bgDim*100)+'%');
+  $('safeZone').value = S.safe || ''; $('bgColor').value = S.bg;
+  setRange('zoom', Math.round(S.zoom*100), Math.round(S.zoom*100)+'%');
+  for (const k of ['bright','contrast','sat']) setRange(k, S[k], S[k]+'%');
+  setRange('master', Math.round(S.master*100), Math.round(S.master*100)+'%');
+  setRange('voVol', Math.round(S.voVol*100), Math.round(S.voVol*100)+'%');
+  $('duckOn').checked = S.duck.on; setRange('duckLvl', Math.round(S.duck.lvl*100), Math.round(S.duck.lvl*100)+'%');
+  if (masterGain) masterGain.gain.value = S.master; if (voGain && !recording) voGain.gain.value = S.voVol;
+}
+let applying = false;
+function applySnap(json){
+  applying = true;
+  const o = JSON.parse(json);
+  for (const k of LOOK) if (k in o) S[k] = o[k];
+  if (o.duck) S.duck = {...o.duck};
+  stop();
+  S.clips = o.clips.map(sc => {
+    let c = CLIPS[sc.id];
+    if (!c){ const m = MEDIA[sc.mid]; if (!m) return null; c = CLIPS[sc.id] = {id:sc.id, mid:sc.mid, name:m.name, el:m.el, dur:m.dur}; }
+    return Object.assign(c, sc);
+  }).filter(Boolean);
+  S.texts = o.texts.map(x => ({...x}));
+  if (!S.clips.some(c => c.id === S.sel)) S.sel = S.clips[0]?.id ?? null;
+  if (!S.texts.some(x => x.id === S.selText)) S.selText = null;
+  // seslendirme
+  let rer = false;
+  if (o.fx) for (const id of FX) if (id in o.fx && $(id).checked !== o.fx[id]){ $(id).checked = o.fx[id]; rer = true; }
+  const nv = o.vo && VOS[o.vo.vid];
+  if (S.vo && S.vo !== nv && S.vo.el) S.vo.el.pause();
+  S.vo = nv || null;
+  if (nv){
+    for (const k of ['in','out','fadeIn','fadeOut']) if (nv[k] !== o.vo[k]){ nv[k] = o.vo[k]; rer = true; }
+    nv.offset = o.vo.offset;
+  }
+  if (rer && S.vo) rerender();
+  syncControls();
+  S.t = Math.min(S.t, total()); seek(S.t); refresh();
+  applying = false;
+}
+// geri al geçmişi: değişiklikleri 400 ms'de bir yakalar
+const hist = []; let hIdx = -1, lastSaved = '', ready = false;
+function updUndo(){ $('btnUndo').disabled = hIdx <= 0; $('btnRedo').disabled = hIdx >= hist.length - 1; }
+function undo(){ if (hIdx <= 0) return toast('Geri alınacak bir şey yok'); hIdx--; applySnap(hist[hIdx]); updUndo(); toast('Geri alındı'); }
+function redo(){ if (hIdx >= hist.length - 1) return; hIdx++; applySnap(hist[hIdx]); updUndo(); toast('Yinelendi'); }
+$('btnUndo').onclick = undo; $('btnRedo').onclick = redo;
+setInterval(() => {
+  if (!ready || applying || S.exporting || recording || drag) return;
+  const j = snapshot();
+  if (j !== hist[hIdx]){ hist.splice(hIdx + 1); hist.push(j); if (hist.length > 120) hist.shift(); hIdx = hist.length - 1; updUndo(); }
+}, 400);
+// otomatik kayıt
+setInterval(async () => {
+  if (!ready || S.exporting) return;
+  const j = hist[hIdx]; if (!j || j === lastSaved) return;
+  lastSaved = j; await store.put('project', j);
+  $('saveState').textContent = S.clips.length ? 'Kaydedildi' : '';
+}, 1500);
+async function restoreProject(){
+  const j = await store.get('project');
+  let o = null; try { o = j && JSON.parse(j); } catch(e){}
+  if (!o || !o.clips || !o.clips.length){ ready = true; return; }
+  $('saveState').textContent = 'Geri yükleniyor…';
+  const mids = [...new Set(o.clips.map(c => c.mid))];
+  for (const mid of mids){
+    const blob = await store.get('m:' + mid);
+    if (blob) try { await loadMedia(blob, blob.name || 'video', mid); } catch(e){}
+  }
+  uid = Math.max(uid, ...o.clips.map(c => c.id + 1), ...mids.map(m => m + 1), ...o.texts.map(x => x.id + 1), o.vo ? o.vo.vid + 1 : 0);
+  if (o.vo){
+    const vb = await store.get('v:' + o.vo.vid);
+    if (vb) await setVO(vb, o.vo.name, o.vo.offset, {vid:o.vo.vid, restoring:true, props:{in:o.vo.in, out:o.vo.out, fadeIn:o.vo.fadeIn, fadeOut:o.vo.fadeOut}});
+  }
+  applySnap(j);
+  if (S.vo) await renderVO();
+  hist.length = 0; hist.push(snapshot()); hIdx = 0; lastSaved = j; updUndo();
+  // artık kullanılmayan dosyaları temizle
+  const used = new Set(['project', ...mids.map(m => 'm:' + m), ...(o.vo ? ['v:' + o.vo.vid] : [])]);
+  for (const k of await store.keys()) if (!used.has(k)) store.del(k);
+  ready = true;
+  $('saveState').textContent = 'Kaydedildi';
+  toast('Önceki çalışman geri yüklendi');
+}
+
 window.__kurgu = S; // test için
 refresh(); requestAnimationFrame(tick);
+restoreProject();
 })();
 </script>
 </body>

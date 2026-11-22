@@ -31,6 +31,9 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Otomatik kısma:** konuşurken video sesini kendiliğinden kısar
 - **Dışa aktarma:** 1080×1920 standart MP4 (H.264 High + AAC, sabit 30 fps) — WhatsApp ve Instagram'da sorunsuz açılır; tek kare PNG
 
+- **Otomatik kayıt:** videolar, yazılar, ses ve ayarlar tarayıcıda (IndexedDB) saklanır; sayfa yenilense de kaldığın yerden devam edersin. "Sıfırla" hepsini siler.
+- **Geri al / yinele:** Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z ya da üst çubuktaki ↶ ↷
+
 ## Notlar
 
 - Dışa aktarma gerçek zamanlıdır: 30 sn'lik video yaklaşık 30 sn sürer, sekmeyi açık tut.
