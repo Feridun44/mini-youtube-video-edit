@@ -24,7 +24,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Fotoğraf:** fotoğrafı klip olarak ekleme (süre ayarı, yavaş yakınlaşma) ya da videonun üstüne görsel katmanı (logo, çıkartma; boyut, saydamlık, köşe, gölge, giriş/çıkış animasyonu)
 - **Klip sıralama:** zaman çizelgesinde sürükle (klip yerinde soluk kalır, bırakılacak yer çizgiyle gösterilir, Esc iptal eder), klip listesinde ⠿ tutamağıyla sürükle-bırak, ← Sola / Sağa → ya da Alt/Option + ← →
 - **Zaman çizelgesi:** yazı ve görsel bloklarını sürükleyerek kaydırma, kenarlarından uzatma/kısaltma; klip sınırlarına ve oynatma çizgisine yapışma; cetvelde sürükleyerek sarma; yakınlaştırma (Cmd/Ctrl + tekerlek, − +, Sığdır)
-- **Geçişler:** yumuşak, kararma, flaş, kaydırma, yakınlaşma, bulanık, ışık sızması, whip pan, zoom vuruşu, dönme, glitch, sarsıntı (süre ayarlı; her klibe ayrı geçiş seçilebilir)
+- **Geçişler:** yumuşak, kararma, flaş, kaydırma, yakınlaşma, bulanık, ışık sızması, whip pan, zoom vuruşu, dönme, glitch, sarsıntı (süre ayarlı; kaydırma ve whip pan için 4 yön: ← → ↑ ↓; her klibe ayrı geçiş seçilebilir)
 - **Kamera hareketi:** klip başına yakınlaş, uzaklaş, zoom vuruşu, sola/sağa kay, el kamerası, titreme; tüm kliplere uygulama
 - **Efektler:** film greni, VHS (tarama çizgileri, PLAY yazısı, sayaç), RGB kayması, sinema bantları, ilerleme çubuğu (üstte/altta, renk seçimi)
 - **Sessiz yerleri kes:** konuşma videolarında uzun duraklamaları otomatik çıkarır (jump cut)
