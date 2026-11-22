@@ -123,6 +123,7 @@ footer{border-top:1px solid var(--line);background:var(--panel)}
 .blk.sel{border-color:#171a21;background:var(--clipSel)}
 .blk.t{background:var(--txtClip)}
 .blk small{display:block;opacity:.8;font-weight:500}
+#trMusic .blk{background:#22a06b;color:#fff;cursor:default}
 #trVO .blk{background:#f08a3c;padding:0;cursor:grab;touch-action:none}
 #trVO .blk canvas{position:absolute;inset:0;width:100%;height:100%}
 #trVO .blk span{position:relative;padding:3px 7px;font-size:10.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3)}
@@ -284,6 +285,29 @@ label.chk input{width:16px;flex:0 0 auto}
       </div>
 
       <div class="card">
+        <h3>Arka plan müziği</h3>
+        <div class="row">
+          <button id="muUpload">♪ Müzik yükle</button>
+          <button id="muRemove" class="danger" disabled>Kaldır</button>
+        </div>
+        <input type="file" id="fileMusic" accept="audio/*" hidden>
+        <div class="hint" id="muInfo">Müzik yok.</div>
+        <div id="muEdit" style="display:none">
+          <label>Müzik seviyesi <span id="muVolV">30%</span></label>
+          <input type="range" id="muVol" min="0" max="100" value="30">
+          <label>Şarkıda başlangıç <span id="muStartV">0.0 sn</span></label>
+          <input type="range" id="muStart" min="0" max="100" value="0">
+          <div class="row">
+            <div><label>Açılış <span id="muFadeInV">1.0 sn</span></label><input type="range" id="muFadeIn" min="0" max="50" value="10"></div>
+            <div><label>Kapanış <span id="muFadeOutV">2.0 sn</span></label><input type="range" id="muFadeOut" min="0" max="50" value="20"></div>
+          </div>
+          <label class="chk"><input type="checkbox" id="muLoop" checked> Video bitene kadar başa sar</label>
+          <label class="chk"><input type="checkbox" id="muDuck" checked> Konuşurken müziği kıs</label>
+        </div>
+        <p class="hint">Telifli şarkılar Instagram, YouTube ve TikTok'ta sesin kapatılmasına yol açabilir. Telifsiz müzik kullan ya da şarkıyı uygulamanın kendi müzik kitaplığından ekle.</p>
+      </div>
+
+      <div class="card">
         <h3>Video sesi</h3>
         <label class="chk"><input type="checkbox" id="duckOn" checked> Konuşurken video sesini kıs</label>
         <label>Kısılınca seviye <span id="duckLvlV">25%</span></label>
@@ -361,6 +385,23 @@ label.chk input{width:16px;flex:0 0 auto}
           <div><label>Yazı rengi</label><input type="color" id="txColor"></div>
           <div><label>Kenarlık</label><input type="color" id="txStroke"></div>
           <div><label>Kalınlık</label><input type="number" id="txStrokeW" min="0" max="30"></div>
+        </div>
+        <label>Giriş animasyonu</label>
+        <div class="opts opts3" id="txAnimIn">
+          <button data-a="none" class="on"><b>Yok</b><small>Direkt görünür</small></button>
+          <button data-a="fade"><b>Belirme</b><small>Yavaşça görünür</small></button>
+          <button data-a="pop"><b>Büyüme</b><small>Zıplayarak gelir</small></button>
+          <button data-a="slide"><b>Kayma</b><small>Aşağıdan çıkar</small></button>
+          <button data-a="type"><b>Daktilo</b><small>Harf harf yazılır</small></button>
+          <button data-a="words"><b>Kelime</b><small>Kelime kelime gelir</small></button>
+        </div>
+        <label>Çıkış animasyonu</label>
+        <div class="row" id="txAnimOut">
+          <button data-a="none" class="on">Yok</button><button data-a="fade">Solma</button><button data-a="shrink">Küçülme</button>
+        </div>
+        <div class="row" style="align-items:flex-end">
+          <div><label>Animasyon süresi <span id="txAnimDurV">0.4 sn</span></label><input type="range" id="txAnimDur" min="15" max="120" value="40"></div>
+          <button id="txAnimPlay" class="auto" title="Yazının başından oynat">▶ Önizle</button>
         </div>
         <label>Konum <span class="hint" style="margin:0">(önizlemede yazıyı sürükleyerek de taşıyabilirsin)</span></label>
         <div class="row" id="txPosBtns">
@@ -479,6 +520,7 @@ label.chk input{width:16px;flex:0 0 auto}
       <div class="track" id="trClips"></div>
       <div class="track small" id="trTexts"></div>
       <div class="track small" id="trVO"></div>
+      <div class="track small" id="trMusic"></div>
       <div id="ph"></div>
     </div>
   </div>
@@ -507,7 +549,7 @@ const FORMATS = {'9:16':[1080,1920],'4:5':[1080,1350],'1:1':[1080,1080],'16:9':[
 
 const S = {
   clips: [], texts: [], vo: null,
-  transType:'none', transDur:0.5,
+  transType:'none', transDur:0.5, music:null,
   fmt:'9:16', fit:'blur', blurAmt:0.6, bgDim:0.2, safe:'', bg:'#000000', zoom:1, bright:100, contrast:100, sat:100, master:1, voVol:1,
   duck:{on:true, lvl:0.25},
   rank:{on:false, dir:'down', pos:'tl', color:'#2ee6a6', text:'#04140e'},
@@ -609,7 +651,7 @@ document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => { e.preventDefault(); if (e.target.closest('#drop')) return; const fs=[...e.dataTransfer.files]; if (fs.length) addVideoFiles(fs); });
 
 // ---------- oynatma ----------
-function pauseAll(){ for (const c of S.clips) if (!c.el.paused) c.el.pause(); if (S.vo && !S.vo.el.paused) S.vo.el.pause(); }
+function pauseAll(){ for (const c of S.clips) if (!c.el.paused) c.el.pause(); if (S.vo && !S.vo.el.paused) S.vo.el.pause(); if (S.music && !S.music.el.paused) S.music.el.pause(); }
 function startClip(i, local){
   S.cur = i; const c = S.clips[i];
   for (const o of S.clips) if (o.el !== c.el && !o.el.paused) o.el.pause();
@@ -652,7 +694,7 @@ function play(){
   if (S.t >= total() - 0.05) S.t = 0;
   S.playing = true;
   const {i, local} = locate(S.t);
-  startClip(i, local); syncVO(); updTransport();
+  startClip(i, local); syncVO(); musicTick(true); updTransport();
 }
 function stop(){ S.playing = false; pauseAll(); updTransport(); }
 function toggle(){ S.playing ? stop() : play(); }
@@ -660,7 +702,7 @@ function seek(t){
   const T = total(); S.t = clamp(t, 0, T);
   if (!S.clips.length){ draw(); updTime(); return; }
   const {i, local} = locate(S.t);
-  if (S.playing){ startClip(i, local); syncVO(); }
+  if (S.playing){ startClip(i, local); syncVO(); musicTick(true); }
   else { S.cur = i; const c = S.clips[i]; c.el.currentTime = clamp(c.in + local, 0, c.dur - 0.001); }
   draw(); updTime();
 }
@@ -675,7 +717,7 @@ function tick(){
         else { S.t = total(); stop(); if (S.exporting) finishExport(); }
       }
     }
-    voTick();
+    voTick(); musicTick(false);
     // sıradaki klibi önceden konumla (farklı dosyaysa): geçişte bekleme olmasın
     const nx = S.clips[S.cur + 1], cur0 = S.clips[S.cur];
     if (nx && cur0 && nx.el !== cur0.el && nx.el.paused && cur0.out - cur0.el.currentTime < 1.2 && Math.abs(nx.el.currentTime - nx.in) > 0.05) nx.el.currentTime = nx.in;
@@ -937,6 +979,11 @@ function drawText(x, W, H){
   const mw = Math.max(0, ...lines.map(l => l.w)), pad = x.size*0.3;
   x._bb = {x: CX - mw/2 - pad, y: y0 - lh/2 - pad*0.5, w: mw + pad*2, h: lh*lines.length + pad};
   const bg = x.bg || (x.box ? 'box' : 'none');
+  const A = textAnim(x, lines);
+  if (A.a <= 0.001) return;
+  ctx.save();
+  ctx.translate(CX, H*x.y + A.dy); ctx.scale(A.s, A.s); ctx.translate(-CX, -H*x.y);
+  ctx.globalAlpha = A.a;
   if (bg !== 'none' && bg !== 'glow') drawTextBg(x, bg, lines, sp, y0, lh, CX, W);
   ctx.lineJoin = 'round'; ctx.miterLimit = 2;
   // önce tüm kenarlıklar, sonra dolgu: harfler birbirinin kenarlığını örtmesin
@@ -946,22 +993,52 @@ function drawText(x, W, H){
   }
   for (const pass of ['stroke','fill']){
     if (pass === 'stroke' && !(x.strokeW > 0)) continue;
+    let gw = 0, left = A.chars;
     lines.forEach((l, k) => {
-      const y = y0 + k*lh; let cx = CX - l.w/2;
+      const y0k = y0 + k*lh; let cx = CX - l.w/2;
       l.words.forEach((w, wi) => {
         if (wi) cx += sp;
-        for (const p of w){
+        const wp = A.word ? A.word(gw++) : 1;
+        ctx.globalAlpha = A.a * wp; const y = y0k + (1 - wp) * x.size * 0.35;
+        for (const p0 of w){
+          let p = p0;
+          if (left !== Infinity){ if (left <= 0){ cx += ctx.measureText(p0.t).width; continue; } const ch = Array.from(p0.t); if (ch.length > left) p = {...p0, t: ch.slice(0, left).join('')}; left -= ch.length; }
           if (pass === 'stroke'){ ctx.lineWidth = x.strokeW*2; ctx.strokeStyle = x.stroke; ctx.strokeText(p.t, cx, y); }
           else {
             ctx.fillStyle = p.col || x.color;
             if (bg === 'glow'){ ctx.shadowColor = rgba(x.bgColor || '#000000', x.bgOp ?? 0.6); ctx.shadowBlur = x.size*(0.2 + (x.bgPad ?? 0.3)); }
             ctx.fillText(p.t, cx, y); ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
           }
-          cx += ctx.measureText(p.t).width;
+          cx += ctx.measureText(p0.t).width;
         }
       });
     });
   }
+  ctx.restore();
+}
+const easeOut = p => 1 - Math.pow(1 - p, 3);
+const backOut = p => 1 + 2.70158*Math.pow(p - 1, 3) + 1.70158*Math.pow(p - 1, 2);
+// Yazı animasyon durumu: saydamlık, ölçek, dikey kayma, daktilo harf sayısı, kelime kelime ilerleme
+function textAnim(x, lines){
+  const d = x.animDur || 0.4, tIn = S.t - x.start;
+  const end = x.end == null ? total() : x.end, tOut = end - S.t;
+  const pIn = clamp(tIn / d, 0, 1);
+  const A = {a:1, s:1, dy:0, chars:Infinity, word:null};
+  switch (x.animIn){
+    case 'fade': A.a = easeOut(pIn); break;
+    case 'pop': A.s = 0.5 + 0.5*backOut(pIn); A.a = Math.min(1, pIn*2.5); break;
+    case 'slide': A.dy = (1 - easeOut(pIn)) * x.size * 0.9; A.a = easeOut(pIn); break;
+    case 'type': {
+      const n = lines.reduce((a, l) => a + l.words.reduce((b, w) => b + w.reduce((c, p) => c + Array.from(p.t).length, 0), 0), 0);
+      const dur = Math.max(d, n * 0.045); A.chars = Math.floor(n * clamp(tIn / dur, 0, 1)); break;
+    }
+    case 'words': { const gap = 0.12 * (d / 0.4); A.word = k => easeOut(clamp((tIn - k*gap) / Math.max(0.12, d*0.6), 0, 1)); break; }
+  }
+  if (x.animOut && x.animOut !== 'none' && isFinite(end)){
+    const pOut = easeOut(clamp(tOut / d, 0, 1));
+    A.a *= pOut; if (x.animOut === 'shrink') A.s *= 0.6 + 0.4*pOut;
+  }
+  return A;
 }
 
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; };
@@ -1068,6 +1145,9 @@ function refresh(){
     $('txFont').value = x.font; $('txSize').value = x.size; $('txSizeV').textContent = x.size + 'px';
     $('txColor').value = x.color; $('txHl').value = x.hl || '#ffd400'; $('txStroke').value = x.stroke; $('txStrokeW').value = x.strokeW;
     $('txY').value = Math.round(x.y*100); $('txYV').textContent = Math.round(x.y*100) + '%';
+    $('txAnimIn').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.a === (x.animIn || 'none')));
+    $('txAnimOut').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.a === (x.animOut || 'none')));
+    $('txAnimDur').value = Math.round((x.animDur || 0.4)*100); $('txAnimDurV').textContent = (x.animDur || 0.4).toFixed(2).replace(/0$/,'') + ' sn';
     const bgm = x.bg || (x.box ? 'box' : 'none');
     $('txBgBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.bg === bgm));
     $('txBgOpts').style.display = bgm === 'none' ? 'none' : 'block';
@@ -1079,7 +1159,7 @@ function refresh(){
     if (document.activeElement !== $('txEnd')) $('txEnd').value = x.end == null ? '' : x.end.toFixed(2);
   }
   // ses
-  refreshVO();
+  refreshVO(); refreshMusic();
   // sıralama
   $('rankOn').textContent = S.rank.on ? 'Açık' : 'Kapalı'; $('rankOn').classList.toggle('on', S.rank.on);
   drawTimeline(); updTime(); draw();
@@ -1112,6 +1192,13 @@ function drawTimeline(){
     b.textContent = stripMarks(x.text.replace(/\n/g,' ')); b.dataset.tid = x.id;
     $('trTexts').appendChild(b);
   });
+  // müzik şeridi
+  $('trMusic').innerHTML = '';
+  if (S.music){
+    const b = document.createElement('div'); b.className = 'blk';
+    b.style.left = '0px'; b.style.width = Math.max(6, total()*S.pps - 2) + 'px';
+    b.textContent = '♪ ' + S.music.name; $('trMusic').appendChild(b);
+  }
   // seslendirme şeridi
   $('trVO').innerHTML = '';
   if (S.vo){
@@ -1231,7 +1318,7 @@ $('ciLabel').oninput = e => { const c = selClip(); if (c){ c.label = e.target.va
 
 // ---------- yazılar ----------
 function addText(preset){
-  const x = Object.assign({id: uid++, text:'YAZINI BURAYA YAZ', font:'Impact', size:96, color:'#ffffff', hl:'#ffd400', stroke:'#000000', strokeW:8, y:0.5, bg:'none', bgColor:'#000000', bgOp:0.6, bgPad:0.3, bgRad:0.25, start: S.t, end: Math.min(S.t + 3, Math.max(total(), S.t + 3))}, preset||{});
+  const x = Object.assign({id: uid++, text:'YAZINI BURAYA YAZ', font:'Impact', size:96, color:'#ffffff', hl:'#ffd400', stroke:'#000000', strokeW:8, y:0.5, bg:'none', bgColor:'#000000', bgOp:0.6, bgPad:0.3, bgRad:0.25, animIn:'none', animOut:'none', animDur:0.4, start: S.t, end: Math.min(S.t + 3, Math.max(total(), S.t + 3))}, preset||{});
   S.texts.push(x); S.selText = x.id; switchTab('R','pText'); loadFont(x.font); refresh();
 }
 $('txAdd').onclick = () => addText();
@@ -1270,6 +1357,12 @@ $('txY').oninput = tx((x,e) => x.y = e.target.value/100);
 $('txBgBtns').onclick = tx((x,e) => { const b = e.target.closest('button'); if (!b) return; x.bg = b.dataset.bg; delete x.box;
   // koyu kutuda kenarlık gereksiz kalabalık yapar; kutulu tarzlarda kenarlığı incelt
   if (['box','line','pill','word','band','tilt'].includes(x.bg) && x.strokeW > 4) x.strokeW = 0; });
+$('txAnimIn').onclick = tx((x,e) => { const b = e.target.closest('button'); if (!b) return; x.animIn = b.dataset.a; previewText(x); });
+$('txAnimOut').onclick = tx((x,e) => { const b = e.target.closest('button'); if (!b) return; x.animOut = b.dataset.a;
+  if (x.animOut !== 'none' && x.end == null) toast('Çıkış animasyonu yazının bitişinde ya da video sonunda oynar'); });
+$('txAnimDur').oninput = tx((x,e) => x.animDur = e.target.value/100);
+$('txAnimPlay').onclick = () => { const x = selTxt(); if (x) previewText(x); };
+function previewText(x){ if (!S.clips.length) return; stop(); seek(Math.max(0, x.start - 0.15)); play(); }
 $('txBgColor').oninput = tx((x,e) => x.bgColor = e.target.value);
 $('txBgOp').oninput = tx((x,e) => x.bgOp = e.target.value/100);
 $('txBgPad').oninput = tx((x,e) => x.bgPad = e.target.value/100);
@@ -1298,6 +1391,65 @@ function slider(id, key, scale){ $(id).oninput = e => { S[key] = +e.target.value
 slider('bright','bright'); slider('contrast','contrast'); slider('sat','sat'); slider('zoom','zoom',0.01);
 $('zoom').addEventListener('change', () => refresh());
 $('lookReset').onclick = () => { for (const k of ['bright','contrast','sat']){ S[k] = 100; $(k).value = 100; $(k+'V').textContent = '100%'; } S.zoom = 1; $('zoom').value = 100; $('zoomV').textContent = '100%'; draw(); toast('Renkler sıfırlandı'); };
+
+// ---------- arka plan müziği ----------
+const MUS = {};
+async function setMusic(blob, name, opts){
+  ensureAudio();
+  const el = document.createElement('audio'); el.preload = 'auto'; el.src = URL.createObjectURL(blob); el.loop = true;
+  $('hiddenMedia').appendChild(el);
+  let dur;
+  try { dur = await loadMeta(el); } catch(e){ el.remove(); return toast('Müzik okunamadı'); }
+  if (S.music && S.music.el) S.music.el.pause();
+  const aid = opts && opts.aid || uid++;
+  el._src = AC.createMediaElementSource(el); el._gain = AC.createGain(); el._gain.gain.value = 0;
+  el._src.connect(el._gain); el._gain.connect(masterGain);
+  S.music = Object.assign({aid, name, el, dur, vol:0.3, start:0, loop:true, fadeIn:1, fadeOut:2, duck:true}, opts && opts.props || {});
+  MUS[aid] = S.music;
+  if (!(opts && opts.restoring)){ store.put('a:' + aid, blob); toast('Müzik eklendi'); }
+  musicTick(true); refresh();
+}
+function musicTarget(){
+  const m = S.music, T = total(); if (!m || !T) return 0;
+  let g = m.vol;
+  if (m.fadeIn > 0) g *= Math.min(1, S.t / m.fadeIn);
+  if (m.fadeOut > 0) g *= Math.min(1, Math.max(0, T - S.t) / m.fadeOut);
+  if (m.duck && voSpeaking()) g *= 0.35;
+  return g;
+}
+function musicTick(force){
+  const m = S.music; if (!m || recording) return;
+  const el = m.el, T = total();
+  let pos = S.t + m.start;
+  const inside = S.playing && S.t < T && (m.loop || pos < m.dur);
+  if (m.loop && m.dur > 0) pos %= m.dur;
+  el.loop = m.loop;
+  if (!inside){ if (!el.paused) el.pause(); return; }
+  if (force || el.paused || Math.abs(el.currentTime - pos) > 0.3) el.currentTime = pos;
+  if (el.paused) el.play().catch(() => {});
+  if (el._gain && AC) el._gain.gain.setTargetAtTime(musicTarget(), AC.currentTime, force ? 0.01 : 0.15);
+}
+function refreshMusic(){
+  const m = S.music;
+  $('muInfo').textContent = m ? `${m.name} · ${m.dur.toFixed(1)} sn` : 'Müzik yok.';
+  $('muEdit').style.display = m ? 'block' : 'none'; $('muRemove').disabled = !m;
+  if (!m) return;
+  setRange('muVol', Math.round(m.vol*100), Math.round(m.vol*100) + '%');
+  $('muStart').max = Math.max(1, Math.floor(m.dur*10) - 10); setRange('muStart', Math.round(m.start*10), m.start.toFixed(1) + ' sn');
+  setRange('muFadeIn', Math.round(m.fadeIn*10), m.fadeIn.toFixed(1) + ' sn');
+  setRange('muFadeOut', Math.round(m.fadeOut*10), m.fadeOut.toFixed(1) + ' sn');
+  $('muLoop').checked = m.loop; $('muDuck').checked = m.duck;
+}
+$('muUpload').onclick = () => $('fileMusic').click();
+$('fileMusic').onchange = e => { const f = e.target.files[0]; if (f) setMusic(f, f.name); e.target.value = ''; };
+$('muRemove').onclick = () => { if (!S.music) return; S.music.el.pause(); S.music = null; refresh(); toast('Müzik kaldırıldı'); };
+const mu = (id, fn) => $(id).addEventListener('input', e => { if (!S.music) return; fn(S.music, e.target); refreshMusic(); musicTick(id === 'muStart'); });
+mu('muVol', (m, t) => m.vol = t.value/100);
+mu('muStart', (m, t) => m.start = t.value/10);
+mu('muFadeIn', (m, t) => m.fadeIn = t.value/10);
+mu('muFadeOut', (m, t) => m.fadeOut = t.value/10);
+$('muLoop').onchange = e => { if (S.music){ S.music.loop = e.target.checked; musicTick(true); } };
+$('muDuck').onchange = e => { if (S.music) S.music.duck = e.target.checked; };
 
 // ---------- ses ----------
 $('master').oninput = e => { S.master = e.target.value/100; $('masterV').textContent = e.target.value + '%'; if (masterGain) masterGain.gain.value = S.master; };
@@ -1498,7 +1650,7 @@ $('voRec').onclick = async () => {
       if (voGain) voGain.gain.value = S.voVol;
       await setVO(new Blob(chunks, {type: chunks[0]?.type || 'audio/webm'}), 'Mikrofon kaydı', startAt);
     };
-    recording = true; if (S.vo && S.vo.el) S.vo.el.pause(); if (voGain) voGain.gain.value = 0;
+    recording = true; if (S.vo && S.vo.el) S.vo.el.pause(); if (S.music) S.music.el.pause(); if (voGain) voGain.gain.value = 0;
     micRec.start(); setRecUI('rec'); refreshVO();
     if ($('voRecPlay').checked && S.clips.length){ seek(startAt); play(); }
   }, 1000);
@@ -1587,8 +1739,10 @@ let resetArm = 0;
 $('btnReset').onclick = () => {
   if (Date.now() - resetArm > 2500){ resetArm = Date.now(); $('btnReset').textContent = 'Emin misin?'; setTimeout(()=>$('btnReset').textContent='Sıfırla', 2500); return; }
   stop(); S.clips.forEach(c => c.el.remove()); if (S.vo) S.vo.el.remove();
-  Object.assign(S, {clips:[], texts:[], vo:null, sel:null, selText:null, t:0, cur:0});
-  for (const o of [MEDIA, CLIPS, VOS]) for (const k in o) delete o[k];
+  if (S.music) S.music.el.pause();
+  Object.assign(S, {clips:[], texts:[], vo:null, music:null, sel:null, selText:null, t:0, cur:0});
+  if (S.music) S.music.el.pause(); S.music = null;
+  for (const o of [MEDIA, CLIPS, VOS, MUS]) for (const k in o) delete o[k];
   store.clear(); hist.length = 0; hIdx = -1; lastSaved = '';
   $('btnReset').textContent = 'Sıfırla'; resetArm = 0; refresh(); toast('Proje sıfırlandı');
 };
@@ -1637,6 +1791,7 @@ function snapshot(){
   o.duck = {...S.duck};
   o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0}; });
   o.texts = S.texts.map(({_bb, ...x}) => x);
+  o.music = S.music ? {aid:S.music.aid, name:S.music.name, vol:S.music.vol, start:S.music.start, loop:S.music.loop, fadeIn:S.music.fadeIn, fadeOut:S.music.fadeOut, duck:S.music.duck} : null;
   o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
   o.fx = Object.fromEntries(FX.map(id => [id, $(id).checked]));
   return JSON.stringify(o);
@@ -1683,6 +1838,9 @@ function applySnap(json){
     nv.offset = o.vo.offset;
   }
   if (rer && S.vo) rerender();
+  const nm = o.music && MUS[o.music.aid];
+  if (S.music && S.music !== nm) S.music.el.pause();
+  S.music = nm || null; if (nm){ const {aid, name, ...props} = o.music; Object.assign(nm, props); }
   syncControls();
   S.t = Math.min(S.t, total()); seek(S.t); refresh();
   applying = false;
@@ -1715,7 +1873,11 @@ async function restoreProject(){
     const blob = await store.get('m:' + mid);
     if (blob) try { await loadMedia(blob, blob.name || 'video', mid); } catch(e){}
   }
-  uid = Math.max(uid, ...o.clips.map(c => c.id + 1), ...mids.map(m => m + 1), ...o.texts.map(x => x.id + 1), o.vo ? o.vo.vid + 1 : 0);
+  uid = Math.max(uid, ...o.clips.map(c => c.id + 1), ...mids.map(m => m + 1), ...o.texts.map(x => x.id + 1), o.vo ? o.vo.vid + 1 : 0, o.music ? o.music.aid + 1 : 0);
+  if (o.music){
+    const mb = await store.get('a:' + o.music.aid);
+    if (mb){ const {aid, name, ...props} = o.music; await setMusic(mb, name, {aid, restoring:true, props}); }
+  }
   if (o.vo){
     const vb = await store.get('v:' + o.vo.vid);
     if (vb) await setVO(vb, o.vo.name, o.vo.offset, {vid:o.vo.vid, restoring:true, props:{in:o.vo.in, out:o.vo.out, fadeIn:o.vo.fadeIn, fadeOut:o.vo.fadeOut}});
@@ -1724,7 +1886,7 @@ async function restoreProject(){
   if (S.vo) await renderVO();
   hist.length = 0; hist.push(snapshot()); hIdx = 0; lastSaved = j; updUndo();
   // artık kullanılmayan dosyaları temizle
-  const used = new Set(['project', ...mids.map(m => 'm:' + m), ...(o.vo ? ['v:' + o.vo.vid] : [])]);
+  const used = new Set(['project', ...mids.map(m => 'm:' + m), ...(o.vo ? ['v:' + o.vo.vid] : []), ...(o.music ? ['a:' + o.music.aid] : [])]);
   for (const k of await store.keys()) if (!used.has(k)) store.del(k);
   ready = true;
   $('saveState').textContent = 'Kaydedildi';
