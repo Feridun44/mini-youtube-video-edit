@@ -978,7 +978,7 @@ const STYLES = {
 $('styleBtns').onclick = e => { const b = e.target.closest('button'); if (!b) return; const st = STYLES[b.dataset.st];
   if (!S.clips.length) return toast('Önce video ekle');
   captureNow();
-  for (const c of S.clips){ c.trans = 'auto'; if (!c.el.isPhoto){ c.speed = st.speed; c.ramp = st.ramp; } }
+  retime(() => { for (const c of S.clips){ c.trans = 'auto'; if (!c.el.isPhoto){ c.speed = st.speed; c.ramp = st.ramp; } } });
   S.transType = st.trans; S.transDur = st.dur; S.filter = st.filter; S.vig = st.vig;
   syncControls(); seek(0); refresh(); captureNow(); toast(st.msg); };
 $('transDur').oninput = e => { S.transDur = e.target.value/10; $('transDurV').textContent = S.transDur.toFixed(1) + ' sn'; draw(); };
@@ -2030,17 +2030,17 @@ $('bDup').onclick = () => withSel((c, i) => { const n = {...c, id: uid++}; S.cli
 
 function setIn(c, v){ c.in = clamp(v, 0, c.out - 0.1); }
 function setOut(c, v){ c.out = clamp(v, c.in + 0.1, c.dur); }
-$('ciIn').onchange = e => withSel(c => { setIn(c, +e.target.value); seek(S.t); });
-$('ciOut').onchange = e => withSel(c => { setOut(c, +e.target.value); seek(S.t); });
+$('ciIn').onchange = e => withSel(c => { retime(() => setIn(c, +e.target.value)); seek(S.t); });
+$('ciOut').onchange = e => withSel(c => { retime(() => setOut(c, +e.target.value)); seek(S.t); });
 $('ciInHere').onclick = () => withSel((c, i) => {
   const local = S.t - offsets()[i];
   if (local < 0 || local > len(c)) return toast('Oynatma çubuğunu bu klibin üstüne getir');
-  setIn(c, c.in + mapOf(c).toSrc(local)); seek(offsets()[i]); toast('Başlangıç kırpıldı');
+  const v = c.in + mapOf(c).toSrc(local); retime(() => setIn(c, v)); seek(offsets()[i]); toast('Başlangıç kırpıldı');
 });
 $('ciOutHere').onclick = () => withSel((c, i) => {
   const local = S.t - offsets()[i];
   if (local < 0 || local > len(c)) return toast('Oynatma çubuğunu bu klibin üstüne getir');
-  setOut(c, c.in + mapOf(c).toSrc(local)); toast('Bitiş kırpıldı');
+  const v = c.in + mapOf(c).toSrc(local); retime(() => setOut(c, v)); seek(S.t); toast('Bitiş kırpıldı');
 });
 $('ciVol').oninput = e => { const c = selClip(); if (!c) return; c.vol = e.target.value/100; $('ciVolV').textContent = e.target.value + '%'; if (S.clips[S.cur]?.el === c.el) applyClipGain(c); };
 $('ciMute').onclick = () => withSel(c => { c.muted = !c.muted; if (S.clips[S.cur]?.el === c.el) applyClipGain(c); });
@@ -2055,21 +2055,35 @@ $('txAdd').onclick = () => addText();
 $('txHook').onclick = () => addText({text:'BAŞLIĞI BURAYA YAZ', y:0.12, start:0, end:null, size:110});
 function loadFont(f){ if (document.fonts && document.fonts.load) document.fonts.load(`800 60px "${f}"`).then(draw).catch(()=>{}); }
 // Hız/eğri değişince oynatma çubuğu aynı kareye denk gelsin
-function changeSpeed(c, fn){
-  const i = S.clips.indexOf(c), local = S.t - offsets()[i], inside = S.cur === i && local >= 0 && local <= len(c);
-  const src = c.in + mapOf(c).toSrc(clamp(local, 0, len(c)));
-  fn(c);
-  c.speed = clamp(+(c.speed || 1).toFixed(3), 0.1, 5);
-  if (inside) S.t = offsets()[i] + mapOf(c).toLocal(src - c.in);
+function changeSpeed(c, fn){ fn(c); c.speed = clamp(+(c.speed || 1).toFixed(3), 0.1, 5); }
+// Klip süresi değişince (hız, kırpma, fotoğraf süresi) sonraki klipler kayar.
+// Oynatma çubuğu, yazılar, görseller, altyazılar ve seslendirme bağlı oldukları kareyle birlikte taşınır.
+function retime(fn){
+  const old = S.clips.map(c => ({c, in: c.in, m: mapOf(c), L: len(c)})), oldOff = [];
+  let o = 0; for (const x of old){ oldOff.push(o); o += x.L; } const oldT = o;
+  fn();
+  const newOff = offsets(), newT = total(), idx = new Map(S.clips.map((c, i) => [c, i]));
+  const map = t => {
+    if (t == null || !old.length) return t;
+    if (t >= oldT - 1e-6) return t - oldT + newT; // videonun sonrası: aynı farkla kaydır
+    let i = 0; while (i < old.length - 1 && t >= oldOff[i] + old[i].L) i++;
+    const x = old[i], j = idx.get(x.c); if (j == null) return t;
+    const src = x.in + x.m.toSrc(clamp(t - oldOff[i], 0, x.L));
+    return newOff[j] + mapOf(x.c).toLocal(src - x.c.in);
+  };
+  for (const x of S.texts){ x.start = map(x.start); if (x.end != null) x.end = Math.max(x.start + 0.05, map(x.end)); }
+  for (const cue of S.subs.items){ cue.start = map(cue.start); cue.end = Math.max(cue.start + 0.05, map(cue.end)); }
+  if (S.vo && S.vo.offset >= 0) S.vo.offset = map(S.vo.offset);
+  S.t = clamp(map(S.t), 0, newT);
 }
 function speedSel(fn){
   const c = selClip(); if (!c) return toast('Önce bir klip seç'); if (c.el.isPhoto) return toast('Fotoğrafın hızı yok; süresini ayarla');
-  withSel(c2 => changeSpeed(c2, fn)); seek(Math.min(S.t, total()));
+  withSel(c2 => retime(() => changeSpeed(c2, fn))); seek(Math.min(S.t, total()));
 }
 $('tlSpeed').onchange = e => { if (e.target.value) speedSel(c => c.speed = +e.target.value); };
 $('ciSpeed').onclick = e => { const b = e.target.closest('button'); if (b) speedSel(c => c.speed = +b.dataset.s); };
 $('ciSpeedR').oninput = e => { const c = selClip(); if (!c || c.el.isPhoto) return;
-  changeSpeed(c, c2 => c2.speed = Math.pow(2, +e.target.value / 100)); seek(Math.min(S.t, total())); refresh(); };
+  retime(() => changeSpeed(c, c2 => c2.speed = Math.pow(2, +e.target.value / 100))); seek(Math.min(S.t, total())); refresh(); };
 $('ciSpeedR').onchange = () => captureNow();
 $('ciTargetGo').onclick = () => { const T = +$('ciTarget').value; if (!(T > 0)) return toast('Saniye cinsinden hedef süre yaz');
   speedSel(c => { c.speed = (c.speed || 1) * len(c) / T; });
@@ -2078,9 +2092,9 @@ $('ciTargetGo').onclick = () => { const T = +$('ciTarget').value; if (!(T > 0)) 
 $('ciTarget').onkeydown = e => { if (e.key === 'Enter') $('ciTargetGo').click(); };
 $('ciRamp').onclick = e => { const b = e.target.closest('button'); if (b) speedSel(c => c.ramp = b.dataset.r); };
 $('ciSpeedAll').onclick = () => { const c = selClip(); if (!c || c.el.isPhoto) return toast('Önce bir video klip seç');
-  captureNow(); let n = 0; for (const o of S.clips) if (!o.el.isPhoto && o !== c){ changeSpeed(o, o2 => { o2.speed = c.speed || 1; o2.ramp = c.ramp || 'none'; }); n++; }
+  captureNow(); let n = 0; retime(() => { for (const o of S.clips) if (!o.el.isPhoto && o !== c){ changeSpeed(o, o2 => { o2.speed = c.speed || 1; o2.ramp = c.ramp || 'none'; }); n++; } });
   seek(Math.min(S.t, total())); refresh(); captureNow(); toast(n ? `${n} klibe uygulandı` : 'Başka video klip yok'); };
-$('ciPDur').oninput = e => withSel(c => { c.out = c.in + e.target.value/10; });
+$('ciPDur').oninput = e => withSel(c => { retime(() => { c.out = c.in + e.target.value/10; }); seek(S.t); });
 $('ciKB').onchange = e => withSel(c => { c.kb = e.target.checked; });
 const tx = fn => e => { const x = selTxt(); if (!x) return; fn(x, e); refresh(); };
 $('imAdd').onclick = () => $('fileImg').click();
