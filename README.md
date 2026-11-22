@@ -28,8 +28,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Güvenli alan kılavuzu:** TikTok, Reels ve Shorts arayüzünün kapladığı yerleri önizlemede gösterir
 - **Yazı:** font, boyut, renk, kenarlık, önizlemede sürükleyerek taşıma, yazı arka planı (kutu, satır, hap, kelime, bant, parıltı, çerçeve, eğik; renk/saydamlık/köşe ayarlı), her kelimeye ayrı renk (kelimeyi seç → renk seç → "Seçili kelimeyi renklendir")
 - **Altyazı:** tarayıcıda otomatik altyazı (Whisper, ses dışarı gönderilmez), SRT/VTT içe/dışa aktarma, elle satır ekleme ve düzenleme; kelime vurgulu / klasik / kutulu / minimal stiller; önizlemede sürükleyerek konumlama
-- **Hız:** klip başına 0.25x – 3x (ağır çekim / hızlandırma, ses perdesi korunur)
-- **Görüntü:** hazır filtreler (sinematik, vintage, siyah-beyaz, sıcak, soğuk, canlı, dramatik, mat) + güç ayarı, vinyet, parlaklık, kontrast, doygunluk, yakınlaştırma
+- **Görüntü:** parlaklık, kontrast, doygunluk, yakınlaştırma
 - **Seslendirme:** geri sayımlı mikrofon kaydı, seviye göstergesi, dalga görünümü, kırpma, kaydırma, açılış/kapanış geçişi
 - **Ses iyileştirme:** uğultu temizleme, gürültü kapısı, EQ, kompresör, normalize, önce/sonra dinleme
 - **Arka plan müziği:** seviye, şarkıda başlangıç noktası, döngü, açılış/kapanış geçişi, konuşurken otomatik kısma
