@@ -104,6 +104,8 @@ main{display:grid;grid-template-columns:304px minmax(0,1fr) 304px;gap:12px;paddi
 .item{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--rs);padding:8px 10px;cursor:pointer}
 .item:hover{border-color:var(--line2)}
 .item.sel{border-color:var(--acc);background:var(--accSoft)}
+.item .x{min-height:24px;min-width:24px;padding:0 6px;font-size:12px;margin:-4px -6px -4px 0;color:var(--muted)}
+.item .x:hover:not(:disabled){color:var(--danger);background:#fff4f4}
 .item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 
 /* Zaman çizelgesi */
@@ -608,7 +610,7 @@ label.chk input{width:16px;flex:0 0 auto}
     <button id="bSplit" title="Oynatma çubuğundan böl (S)">✂ Böl</button>
     <button id="bLeft" title="Seçili klibi sola taşı">← Sola</button>
     <button id="bRight" title="Seçili klibi sağa taşı">Sağa →</button>
-    <button id="bDel" class="danger" title="Seçili klibi sil (Delete)">Sil</button>
+    <button id="bDel" class="danger" title="Seçili öğeyi sil (Delete) · Esc: seçimi bırak">Sil</button>
     <button id="bDup" title="Seçili klibi çoğalt" hidden>Çoğalt</button>
     <span class="sp"></span>
     <span class="mono" id="tlInfo">0 klip</span>
@@ -755,7 +757,7 @@ async function addVideoFiles(files){
       const m = await loadMedia(f, f.name);
       store.put('m:' + m.mid, f);
       const c = {id: uid++, mid: m.mid, name: f.name, el: m.el, dur: m.dur, in: 0, out: m.photo ? 3 : m.dur, vol: 1, muted: false, label: '', kb: true};
-      CLIPS[c.id] = c; S.clips.push(c); S.sel = c.id; n++;
+      CLIPS[c.id] = c; S.clips.push(c); S.sel = c.id; S.focus = 'clip'; n++;
     } catch(e){ toast(f.name + ': ' + e.message); }
   }
   if (n){ toast(n + ' öğe eklendi'); seek(S.t); }
@@ -880,6 +882,7 @@ cv.addEventListener('pointerdown', e => {
     switchTab('R','pSubs'); cv.style.cursor = 'grabbing'; return;
   }
   if (!x){
+    if (S.selText != null){ S.selText = null; S.focus = null; refresh(); }
     const c = S.clips[S.cur]; if (!c || !c.el.videoWidth) return;
     const r = videoRect(c, p.W, p.H); if (!r.mx && !r.my) return;
     e.preventDefault(); cv.setPointerCapture(e.pointerId);
@@ -888,6 +891,7 @@ cv.addEventListener('pointerdown', e => {
   }
   e.preventDefault(); cv.setPointerCapture(e.pointerId);
   drag = {x, dx: p.x - p.W*(x.x == null ? 0.5 : x.x), dy: p.y - p.H*x.y};
+  S.focus = 'text';
   if (S.selText !== x.id){ S.selText = x.id; switchTab('R','pText'); refresh(); }
   cv.style.cursor = 'grabbing';
 });
@@ -1379,9 +1383,9 @@ function refresh(){
   $('clipList').innerHTML = '';
   S.clips.forEach((c, i) => {
     const d = document.createElement('div'); d.className = 'item' + (c.id === S.sel ? ' sel' : '');
-    d.innerHTML = `<span class="mono">${i+1}</span><span class="nm"></span><span class="mono">${len(c).toFixed(1)}s</span>`;
+    d.innerHTML = `<span class="mono">${i+1}</span><span class="nm"></span><span class="mono">${len(c).toFixed(1)}s</span><button class="ghost x" title="Klibi sil" aria-label="Klibi sil">✕</button>`;
     d.querySelector('.nm').textContent = c.name;
-    d.onclick = () => { S.sel = c.id; seek(off[i] + 0.001); refresh(); };
+    d.onclick = e => { S.sel = c.id; S.focus = 'clip'; if (e.target.closest('.x')){ deleteClip(c); return; } seek(off[i] + 0.001); refresh(); };
     $('clipList').appendChild(d);
   });
   // klip denetçisi
@@ -1401,14 +1405,17 @@ function refresh(){
     $('ciMute').classList.toggle('on', c.muted); $('ciMute').textContent = c.muted ? 'Sessiz ✓' : 'Sessiz';
     if (document.activeElement !== $('ciLabel')) $('ciLabel').value = c.label;
   }
-  ['bDel','bLeft','bRight','bDup'].forEach(b => $(b).disabled = !c); $('bSplit').disabled = !S.clips.length;
+  ['bLeft','bRight','bDup'].forEach(b => $(b).disabled = !c); $('bSplit').disabled = !S.clips.length;
+  const fT = S.focus === 'text' && selTxt();
+  $('bDel').disabled = !(fT || (S.focus === 'clip' && c));
+  $('bDel').textContent = fT ? (fT.kind === 'img' ? 'Görseli sil' : 'Yazıyı sil') : 'Klibi sil';
   // yazı listesi
   $('textList').innerHTML = '';
   S.texts.forEach(x => {
     const d = document.createElement('div'); d.className = 'item' + (x.id === S.selText ? ' sel' : '');
-    d.innerHTML = `<span class="nm"></span><span class="mono">${x.start.toFixed(1)}–${x.end==null?'son':x.end.toFixed(1)}</span>`;
+    d.innerHTML = `<span class="nm"></span><span class="mono">${x.start.toFixed(1)}–${x.end==null?'son':x.end.toFixed(1)}</span><button class="ghost x" title="Sil" aria-label="Sil">✕</button>`;
     d.querySelector('.nm').textContent = x.kind === 'img' ? '🖼 ' + x.name : (stripMarks(x.text.replace(/\n/g,' ')) || '(boş)');
-    d.onclick = () => { S.selText = x.id; refresh(); };
+    d.onclick = e => { S.selText = x.id; S.focus = 'text'; if (e.target.closest('.x')){ deleteText(x); return; } refresh(); };
     $('textList').appendChild(d);
   });
   const x = selTxt(), isImg = x && x.kind === 'img';
@@ -1526,7 +1533,7 @@ $('trClips').addEventListener('pointermove', e => {
     for (let k = 0; k < others.length; k++){ const L = len(others[k]); if (t < acc + L/2){ idx = k; break; } acc += L; }
     const cur = S.clips.indexOf(c); if (idx !== cur){ S.clips.splice(cur, 1); S.clips.splice(idx, 0, c); }
   }
-  S.sel = c.id; drawTimeline();
+  S.sel = c.id; S.focus = 'clip'; drawTimeline();
   const blk = $('trClips').querySelector(`.blk[data-id="${c.id}"]`); if (blk) blk.classList.add('dragging');
   $('trClips').style.cursor = tdrag.edge === 'M' ? 'grabbing' : 'ew-resize';
   if (tdrag.edge !== 'M'){ const off = offsets()[S.clips.indexOf(c)]; seek(tdrag.edge === 'L' ? off : off + len(c) - 0.04); }
@@ -1535,11 +1542,11 @@ const tEnd = () => { if (!tdrag) return; if (tdrag.moved){ tMoved = true; S.sel 
 $('trClips').addEventListener('pointerup', tEnd); $('trClips').addEventListener('pointercancel', tEnd);
 $('trClips').addEventListener('click', e => {
   if (tMoved){ tMoved = false; return; }
-  const b = e.target.closest('.blk'); if (b) S.sel = +b.dataset.id;
+  const b = e.target.closest('.blk'); if (b){ S.sel = +b.dataset.id; S.focus = 'clip'; }
   seek(timeFromEvent(e)); refresh();
 });
 $('trTexts').addEventListener('click', e => {
-  const b = e.target.closest('.blk'); if (b){ S.selText = +b.dataset.tid; switchTab('R','pText'); }
+  const b = e.target.closest('.blk'); if (b){ S.selText = +b.dataset.tid; S.focus = 'text'; switchTab('R','pText'); }
   seek(timeFromEvent(e)); refresh();
 });
 $('ruler').addEventListener('click', e => seek(timeFromEvent(e)));
@@ -1566,19 +1573,36 @@ $('tSnap').onclick = () => {
 };
 
 // ---------- klip işlemleri ----------
-function withSel(fn){ const c = selClip(); if (!c) return toast('Önce klip seç'); fn(c, S.clips.indexOf(c)); refresh(); }
+function withSel(fn){ const c = selClip(); if (!c) return toast('Önce klip seç'); captureNow(); fn(c, S.clips.indexOf(c)); refresh(); captureNow(); }
 $('bSplit').onclick = () => {
   if (!S.clips.length) return toast('Önce video yükle');
   const {i, local} = locate(S.t); const c = S.clips[i]; S.sel = c.id;
   if (local <= 0.1 || local >= len(c) - 0.1){ refresh(); return toast('Klibin ucuna çok yakın'); }
+  captureNow();
   const cut = c.in + local * spd(c);
   const n = {...c, id: uid++, in: cut, label: ''}; c.out = cut;
-  S.clips.splice(i+1, 0, n); S.sel = n.id; toast('Klip bölündü'); refresh();
+  S.clips.splice(i+1, 0, n); S.sel = n.id; S.focus = 'clip'; toast('Klip bölündü'); refresh(); captureNow();
 };
-$('bDel').onclick = () => withSel((c, i) => {
-  stop(); S.clips.splice(i, 1); c.el.pause(); // öğe geri al için saklanır
-  S.sel = S.clips[Math.min(i, S.clips.length-1)]?.id ?? null; seek(Math.min(S.t, total())); toast('Klip silindi');
-});
+const UNDO_HINT = navigator.platform.includes('Mac') ? 'Cmd+Z' : 'Ctrl+Z';
+function deleteClip(c){
+  const i = S.clips.indexOf(c); if (i < 0) return;
+  captureNow(); stop(); S.clips.splice(i, 1); c.el.pause(); // öğe geri al için saklanır
+  S.sel = S.clips[Math.min(i, S.clips.length-1)]?.id ?? null; S.focus = S.sel != null ? 'clip' : null;
+  seek(Math.min(S.t, total())); refresh(); captureNow(); toast(`Klip silindi · geri almak için ${UNDO_HINT}`);
+}
+function deleteText(x){
+  captureNow(); S.texts = S.texts.filter(o => o !== x); if (S.selText === x.id) S.selText = null; S.focus = null;
+  refresh(); captureNow(); toast(`${x.kind === 'img' ? 'Görsel' : 'Yazı'} silindi · geri almak için ${UNDO_HINT}`);
+}
+// Seçili olan neyse onu sil: en son yazı/görsel seçildiyse o, klip seçildiyse klip
+function deleteFocused(){
+  const x = selTxt();
+  if (S.focus === 'text' && x) return deleteText(x);
+  const c = selClip();
+  if (S.focus === 'clip' && c) return deleteClip(c);
+  toast('Silmek için önce bir öğe seç');
+}
+$('bDel').onclick = () => deleteFocused();
 $('bLeft').onclick = () => withSel((c, i) => { if (i === 0) return; S.clips.splice(i,1); S.clips.splice(i-1,0,c); seek(offsets()[i-1]); });
 $('bRight').onclick = () => withSel((c, i) => { if (i === S.clips.length-1) return; S.clips.splice(i,1); S.clips.splice(i+1,0,c); seek(offsets()[i+1]); });
 $('bDup').onclick = () => withSel((c, i) => { const n = {...c, id: uid++}; S.clips.splice(i+1, 0, n); S.sel = n.id; toast('Klip çoğaltıldı'); });
@@ -1604,7 +1628,7 @@ $('ciLabel').oninput = e => { const c = selClip(); if (c){ c.label = e.target.va
 // ---------- yazılar ----------
 function addText(preset){
   const x = Object.assign({id: uid++, text:'YAZINI BURAYA YAZ', font:'Impact', size:96, color:'#ffffff', hl:'#ffd400', stroke:'#000000', strokeW:8, y:0.5, bg:'none', bgColor:'#000000', bgOp:0.6, bgPad:0.3, bgRad:0.25, animIn:'none', animOut:'none', animDur:0.4, start: S.t, end: Math.min(S.t + 3, Math.max(total(), S.t + 3))}, preset||{});
-  S.texts.push(x); S.selText = x.id; switchTab('R','pText'); loadFont(x.font); refresh();
+  S.texts.push(x); S.selText = x.id; S.focus = 'text'; switchTab('R','pText'); loadFont(x.font); refresh();
 }
 $('txAdd').onclick = () => addText();
 $('txHook').onclick = () => addText({text:'BAŞLIĞI BURAYA YAZ', y:0.12, start:0, end:null, size:110});
@@ -1626,7 +1650,7 @@ $('fileImg').onchange = async e => {
     const w = img.naturalWidth >= img.naturalHeight ? 0.5 : 0.35;
     const x = {id: uid++, kind:'img', imgId, name: f.name, w, op: 1, rad: 0, shadow: false, x: 0.5, y: 0.5, animIn:'pop', animOut:'none', animDur:0.4,
       start: S.t, end: null};
-    S.texts.push(x); S.selText = x.id; switchTab('R','pText'); refresh(); toast('Görsel eklendi');
+    S.texts.push(x); S.selText = x.id; S.focus = 'text'; switchTab('R','pText'); refresh(); toast('Görsel eklendi');
   } catch(err){ toast('Görsel okunamadı'); }
 };
 const im = (id, fn) => $(id).addEventListener('input', tx((x,e) => { if (x.kind === 'img') fn(x, e.target); }));
@@ -1638,7 +1662,7 @@ $('imAnimIn').onclick = tx((x,e) => { const b = e.target.closest('button'); if (
 $('imAnimOut').onclick = tx((x,e) => { const b = e.target.closest('button'); if (b) x.animOut = b.dataset.a; });
 $('imStart').onchange = tx((x,e) => x.start = Math.max(0, +e.target.value||0));
 $('imEnd').onchange = tx((x,e) => x.end = e.target.value === '' ? null : Math.max(x.start + 0.1, +e.target.value));
-$('imDel').onclick = () => { S.texts = S.texts.filter(x => x.id !== S.selText); S.selText = null; refresh(); toast('Görsel silindi'); };
+$('imDel').onclick = () => { const x = selTxt(); if (x) deleteText(x); };
 $('txText').oninput = tx((x,e) => x.text = e.target.value);
 $('txFont').onchange = tx((x,e) => { x.font = e.target.value; loadFont(x.font); });
 $('txSize').oninput = tx((x,e) => x.size = +e.target.value);
@@ -1688,7 +1712,7 @@ $('txStart').onchange = tx((x,e) => x.start = Math.max(0, +e.target.value||0));
 $('txEnd').onchange = tx((x,e) => x.end = e.target.value === '' ? null : Math.max(x.start + 0.1, +e.target.value));
 $('txStartHere').onclick = tx(x => { x.start = S.t; if (x.end != null && x.end <= x.start) x.end = x.start + 1; });
 $('txEndHere').onclick = tx(x => { x.end = Math.max(x.start + 0.1, S.t); });
-$('txDel').onclick = () => { S.texts = S.texts.filter(x => x.id !== S.selText); S.selText = null; refresh(); toast('Yazı silindi'); };
+$('txDel').onclick = () => { const x = selTxt(); if (x) deleteText(x); };
 
 // ---------- görüntü ----------
 function seg(boxId, attr, key){
@@ -2229,7 +2253,8 @@ document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
   if (e.code === 'Space'){ e.preventDefault(); toggle(); }
   else if (e.key === 's' || e.key === 'S') $('bSplit').click();
-  else if (e.key === 'Delete' || e.key === 'Backspace') $('bDel').click();
+  else if (e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); deleteFocused(); }
+  else if (e.key === 'Escape'){ S.selText = null; S.focus = null; refresh(); }
   else if (e.key === 'ArrowLeft') seek(S.t - (e.shiftKey ? 1 : 1/30));
   else if (e.key === 'ArrowRight') seek(S.t + (e.shiftKey ? 1 : 1/30));
 });
@@ -2326,7 +2351,9 @@ function applySnap(json){
 // geri al geçmişi: değişiklikleri 400 ms'de bir yakalar
 const hist = []; let hIdx = -1, lastSaved = '', ready = false;
 function updUndo(){ $('btnUndo').disabled = hIdx <= 0; $('btnRedo').disabled = hIdx >= hist.length - 1; }
-function undo(){ if (hIdx <= 0) return toast('Geri alınacak bir şey yok'); hIdx--; applySnap(hist[hIdx]); updUndo(); toast('Geri alındı'); }
+// geri almadan önce henüz yakalanmamış son değişikliği geçmişe ekle (ör. silmeden hemen sonra Cmd+Z)
+function captureNow(){ if (!ready || applying || S.exporting) return; const j = snapshot(); if (j !== hist[hIdx]){ hist.splice(hIdx + 1); hist.push(j); hIdx = hist.length - 1; } }
+function undo(){ captureNow(); if (hIdx <= 0) return toast('Geri alınacak bir şey yok'); hIdx--; applySnap(hist[hIdx]); updUndo(); toast('Geri alındı'); }
 function redo(){ if (hIdx >= hist.length - 1) return; hIdx++; applySnap(hist[hIdx]); updUndo(); toast('Yinelendi'); }
 $('btnUndo').onclick = undo; $('btnRedo').onclick = redo;
 setInterval(() => {
