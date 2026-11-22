@@ -100,6 +100,14 @@ main{display:grid;grid-template-columns:304px minmax(0,1fr) 304px;gap:12px;paddi
 #trClips .blk:before{left:2px} #trClips .blk:after{right:2px}
 #trClips .blk:hover:before,#trClips .blk:hover:after,#trClips .blk.sel:before,#trClips .blk.sel:after{opacity:1}
 #trClips .blk.dragging{opacity:.75;box-shadow:0 6px 16px rgba(23,26,33,.25);z-index:3}
+#trClips .blk.placeholder{opacity:.3;border:2px dashed var(--acc)}
+#dragGhost{pointer-events:none;z-index:8;border-color:var(--acc)!important;box-shadow:0 10px 24px rgba(23,26,33,.35);transform:translateY(-3px) rotate(-.6deg);opacity:.95}
+#dragGhost.noop{border-color:#fff!important;opacity:.8}
+#dropMark{position:absolute;top:-4px;bottom:-4px;width:4px;margin-left:-2px;border-radius:2px;background:var(--acc);box-shadow:0 0 0 3px var(--accSoft);z-index:9;pointer-events:none;display:none}
+#dropMark:before{content:"";position:absolute;top:-5px;left:-4px;border:6px solid transparent;border-top-color:var(--acc)}
+.item .grip{cursor:grab;color:var(--muted);font-size:14px;line-height:1;user-select:none;margin:0 -2px 0 -4px}
+.item.dragSrc{opacity:.4}
+.item.dropBefore{box-shadow:0 -3px 0 var(--acc)} .item.dropAfter{box-shadow:0 3px 0 var(--acc)}
 .list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 .item{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--rs);padding:8px 10px;cursor:pointer}
 .item:hover{border-color:var(--line2)}
@@ -716,8 +724,8 @@ label.chk input{width:16px;flex:0 0 auto}
     <b style="margin-right:6px">Zaman çizelgesi</b>
     <button id="bAdd" class="primary" title="Sona video ya da fotoğraf ekle">+ Video / foto ekle</button>
     <button id="bSplit" title="Oynatma çubuğundan böl (S)">✂ Böl</button>
-    <button id="bLeft" title="Seçili klibi sola taşı">← Sola</button>
-    <button id="bRight" title="Seçili klibi sağa taşı">Sağa →</button>
+    <button id="bLeft" title="Seçili klibi bir öne al (Alt/Option + ←)">← Sola</button>
+    <button id="bRight" title="Seçili klibi bir sonraya al (Alt/Option + →)">Sağa →</button>
     <select id="tlSpeed" title="Seçili klibin hızı" aria-label="Seçili klibin hızı">
       <option value="">Hız</option><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1">1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option>
     </select>
@@ -1719,9 +1727,18 @@ function refresh(){
   $('clipList').innerHTML = '';
   S.clips.forEach((c, i) => {
     const d = document.createElement('div'); d.className = 'item' + (c.id === S.sel ? ' sel' : '');
-    d.innerHTML = `<span class="mono">${i+1}</span><span class="nm"></span><span class="mono">${len(c).toFixed(1)}s</span><button class="ghost x" title="Klibi sil" aria-label="Klibi sil">✕</button>`;
+    d.innerHTML = `<span class="grip" title="Sürükleyerek sırasını değiştir" aria-hidden="true">⠿</span><span class="mono">${i+1}</span><span class="nm"></span><span class="mono">${len(c).toFixed(1)}s</span><button class="ghost x" title="Klibi sil" aria-label="Klibi sil">✕</button>`;
     d.querySelector('.nm').textContent = c.name;
     d.onclick = e => { S.sel = c.id; S.focus = 'clip'; if (e.target.closest('.x')){ deleteClip(c); return; } seek(off[i] + 0.001); refresh(); };
+    // listede sürükle-bırak: üst/alt yarıya göre araya yerleştir
+    d.draggable = S.clips.length > 1;
+    d.ondragstart = e => { listDrag = i; listGap = null; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/x-clip', String(c.id)); d.classList.add('dragSrc'); };
+    d.ondragend = () => { listDrag = null; $('clipList').querySelectorAll('.item').forEach(o => o.classList.remove('dragSrc','dropBefore','dropAfter')); };
+    d.ondragover = e => { if (listDrag == null) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const r = d.getBoundingClientRect(), after = e.clientY > r.top + r.height/2;
+      $('clipList').querySelectorAll('.item').forEach(o => o.classList.remove('dropBefore','dropAfter'));
+      listGap = i + (after ? 1 : 0); if (listGap !== listDrag && listGap !== listDrag + 1) d.classList.add(after ? 'dropAfter' : 'dropBefore'); };
+    d.ondrop = e => { if (listDrag == null) return; e.preventDefault(); e.stopPropagation(); const from = listDrag, gap = listGap; listDrag = null; if (gap != null) moveClip(from, gap); else refresh(); };
     $('clipList').appendChild(d);
   });
   // klip denetçisi
@@ -1891,10 +1908,27 @@ $('trClips').addEventListener('pointermove', e => {
   if (tdrag.edge === 'L') c.in = clamp(tdrag.in0 + dx/S.pps*spd(c), 0, c.out - 0.2);
   else if (tdrag.edge === 'R') c.out = clamp(tdrag.out0 + dx/S.pps*spd(c), c.in + 0.2, c.dur);
   else {
-    // bırakılacak sırayı imlecin zamanına göre bul
-    const t = timeFromEvent(e), others = S.clips.filter(o => o !== c); let acc = 0, idx = others.length;
-    for (let k = 0; k < others.length; k++){ const L = len(others[k]); if (t < acc + L/2){ idx = k; break; } acc += L; }
-    const cur = S.clips.indexOf(c); if (idx !== cur){ S.clips.splice(cur, 1); S.clips.splice(idx, 0, c); }
+    // taşıma: klip yerinde soluk kalır, kopyası imleçle gelir, bırakılacak yer çizgiyle gösterilir
+    if (!tdrag.ghost){
+      const src = $('trClips').querySelector(`.blk[data-id="${c.id}"]`); if (!src) return;
+      src.classList.add('placeholder');
+      const g = src.cloneNode(true); g.id = 'dragGhost'; g.classList.remove('sel', 'placeholder'); $('trClips').appendChild(g);
+      const mk = document.createElement('div'); mk.id = 'dropMark'; $('trClips').appendChild(mk);
+      tdrag.ghost = g; tdrag.mark = mk; tdrag.grab = tdrag.x0 - src.getBoundingClientRect().left; tdrag.gap = null;
+      $('trClips').style.cursor = 'grabbing'; S.sel = c.id; S.focus = 'clip';
+    }
+    const sc = $('tlScroll'), sr = sc.getBoundingClientRect();
+    if (e.clientX < sr.left + 40) sc.scrollLeft -= 14; else if (e.clientX > sr.right - 40) sc.scrollLeft += 14;
+    const x = e.clientX - $('tl').getBoundingClientRect().left, g = tdrag.ghost, w = g.offsetWidth;
+    g.style.left = Math.max(0, x - tdrag.grab) + 'px';
+    const off = offsets(), n = S.clips.length, cur = S.clips.indexOf(c), gx = k => (k < n ? off[k] : total()) * S.pps;
+    const center = Math.max(0, x - tdrag.grab) + w/2; let best = 0;
+    for (let k = 1; k <= n; k++) if (Math.abs(center - gx(k)) < Math.abs(center - gx(best))) best = k;
+    const noop = best === cur || best === cur + 1;
+    tdrag.gap = noop ? null : best;
+    g.classList.toggle('noop', noop);
+    tdrag.mark.style.display = noop ? 'none' : 'block'; tdrag.mark.style.left = gx(best) + 'px';
+    return;
   }
   applyTime(tdrag.ts);
   S.sel = c.id; S.focus = 'clip'; drawTimeline();
@@ -1902,7 +1936,16 @@ $('trClips').addEventListener('pointermove', e => {
   $('trClips').style.cursor = tdrag.edge === 'M' ? 'grabbing' : 'ew-resize';
   if (tdrag.edge !== 'M'){ const off = offsets()[S.clips.indexOf(c)]; seek(tdrag.edge === 'L' ? off : off + len(c) - 0.04); }
 });
-const tEnd = () => { if (!tdrag) return; if (tdrag.moved){ tMoved = true; S.sel = tdrag.c.id; seek(Math.min(S.t, total())); refresh(); captureNow(); } tdrag = null; $('trClips').style.cursor = ''; };
+const tEnd = e => {
+  if (!tdrag) return; const d = tdrag; tdrag = null; $('trClips').style.cursor = '';
+  if (d.edge === 'M'){
+    if (d.moved) tMoved = true;
+    if (d.ghost){ const gap = e && e.type === 'pointercancel' ? null : d.gap; if (gap != null) moveClip(S.clips.indexOf(d.c), gap); else drawTimeline(); }
+    return;
+  }
+  if (d.moved){ tMoved = true; S.sel = d.c.id; seek(Math.min(S.t, total())); refresh(); captureNow(); }
+};
+function cancelClipDrag(){ if (!tdrag || tdrag.edge !== 'M') return false; tdrag = null; $('trClips').style.cursor = ''; drawTimeline(); toast('Taşıma iptal edildi'); return true; }
 $('trClips').addEventListener('pointerup', tEnd); $('trClips').addEventListener('pointercancel', tEnd);
 $('trClips').addEventListener('click', e => {
   if (tMoved){ tMoved = false; return; }
@@ -2036,8 +2079,18 @@ function deleteFocused(){
   toast('Silmek için önce bir öğe seç');
 }
 $('bDel').onclick = () => deleteFocused();
-$('bLeft').onclick = () => withSel((c, i) => { if (i === 0) return; retime(() => { S.clips.splice(i,1); S.clips.splice(i-1,0,c); }); seek(offsets()[i-1]); });
-$('bRight').onclick = () => withSel((c, i) => { if (i === S.clips.length-1) return; retime(() => { S.clips.splice(i,1); S.clips.splice(i+1,0,c); }); seek(offsets()[i+1]); });
+// Klibi araya taşı: gap = hangi klibin önüne (0 = en başa, n = en sona). Yazı ve altyazılar klibiyle gider.
+let listDrag = null, listGap = null;
+function moveClip(from, gap){
+  const c = S.clips[from]; if (!c) return;
+  if (gap === from || gap === from + 1){ refresh(); return; }
+  captureNow(); stop();
+  retime(() => { S.clips.splice(from, 1); S.clips.splice(gap > from ? gap - 1 : gap, 0, c); });
+  const j = S.clips.indexOf(c); S.sel = c.id; S.focus = 'clip';
+  seek(offsets()[j] + 0.001); refresh(); captureNow(); toast(`Klip ${j + 1}. sıraya taşındı`);
+}
+$('bLeft').onclick = () => { const c = selClip(); if (!c) return toast('Önce klip seç'); const i = S.clips.indexOf(c); if (i === 0) return toast('Klip zaten en başta'); moveClip(i, i - 1); };
+$('bRight').onclick = () => { const c = selClip(); if (!c) return toast('Önce klip seç'); const i = S.clips.indexOf(c); if (i === S.clips.length - 1) return toast('Klip zaten en sonda'); moveClip(i, i + 2); };
 $('bDup').onclick = () => withSel((c, i) => { const n = {...c, id: uid++}; retime(() => S.clips.splice(i+1, 0, n)); S.sel = n.id; toast('Klip çoğaltıldı'); });
 
 function setIn(c, v){ c.in = clamp(v, 0, c.out - 0.1); }
@@ -2773,7 +2826,8 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space'){ e.preventDefault(); toggle(); }
   else if (e.key === 's' || e.key === 'S') $('bSplit').click();
   else if (e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); deleteFocused(); }
-  else if (e.key === 'Escape'){ S.selText = null; S.focus = null; refresh(); }
+  else if (e.key === 'Escape'){ if (cancelClipDrag()) return; S.selText = null; S.focus = null; refresh(); }
+  else if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')){ e.preventDefault(); $(e.key === 'ArrowLeft' ? 'bLeft' : 'bRight').click(); }
   else if (e.key === 'ArrowLeft') seek(S.t - (e.shiftKey ? 1 : 1/30));
   else if (e.key === 'ArrowRight') seek(S.t + (e.shiftKey ? 1 : 1/30));
 });
