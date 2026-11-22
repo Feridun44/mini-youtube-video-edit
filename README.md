@@ -22,6 +22,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 
 - **Video:** birden çok videoyu ekleyip birleştirme, zaman çizelgesinde sürükleyerek sıralama, kenardan sürükleyerek kesme, bölme, klip başına ses
 - **Fotoğraf:** fotoğrafı klip olarak ekleme (süre ayarı, yavaş yakınlaşma) ya da videonun üstüne görsel katmanı (logo, çıkartma; boyut, saydamlık, köşe, gölge, giriş/çıkış animasyonu)
+- **Klip sıralama:** zaman çizelgesinde sürükle (klip yerinde soluk kalır, bırakılacak yer çizgiyle gösterilir, Esc iptal eder), klip listesinde ⠿ tutamağıyla sürükle-bırak, ← Sola / Sağa → ya da Alt/Option + ← →
 - **Zaman çizelgesi:** yazı ve görsel bloklarını sürükleyerek kaydırma, kenarlarından uzatma/kısaltma; klip sınırlarına ve oynatma çizgisine yapışma; cetvelde sürükleyerek sarma; yakınlaştırma (Cmd/Ctrl + tekerlek, − +, Sığdır)
 - **Geçişler:** yumuşak, kararma, flaş, kaydırma, yakınlaşma, bulanık, ışık sızması, whip pan, zoom vuruşu, dönme, glitch, sarsıntı (süre ayarlı; her klibe ayrı geçiş seçilebilir)
 - **Kamera hareketi:** klip başına yakınlaş, uzaklaş, zoom vuruşu, sola/sağa kay, el kamerası, titreme; tüm kliplere uygulama
