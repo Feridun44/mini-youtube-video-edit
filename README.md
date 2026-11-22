@@ -30,6 +30,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Yazı:** font, boyut, renk, kenarlık, önizlemede sürükleyerek taşıma, yazı arka planı (kutu, satır, hap, kelime, bant, parıltı, çerçeve, eğik; renk/saydamlık/köşe ayarlı), her kelimeye ayrı renk (kelimeyi seç → renk seç → "Seçili kelimeyi renklendir")
 - **Altyazı:** tarayıcıda otomatik altyazı (Whisper, ses dışarı gönderilmez), SRT/VTT içe/dışa aktarma, elle satır ekleme ve düzenleme; kelime vurgulu / klasik / kutulu / minimal stiller; önizlemede sürükleyerek konumlama
 - **Hız:** klip başına 0.1x – 5x (hazır butonlar, serbest kaydırıcı, zaman çizelgesinde hız menüsü); hedef süreye sığdırma; hız eğrileri (yavaş başla, yavaş bitir, ortası ağır, ortası hızlı); tüm kliplere uygulama. Süre hıza göre kısalır/uzar, ses perdesi korunur
+- **Kırpma:** klip başına üst/alt/sol/sağ kenarları kes (ör. alttaki bozuk kısım), tüm kliplere uygula; tek tıkla Shorts'a çevir (9:16 tam ekran, görünen kısmı sürükleyerek seç)
 - **Görüntü:** hazır filtreler (sinematik, vintage, siyah-beyaz, sıcak, soğuk, canlı, dramatik, mat) + güç ayarı, vinyet, parlaklık, kontrast, doygunluk, yakınlaştırma
 - **Seslendirme:** geri sayımlı mikrofon kaydı, seviye göstergesi, dalga görünümü, kırpma, kaydırma, açılış/kapanış geçişi
 - **Ses iyileştirme:** uğultu temizleme, gürültü kapısı, EQ, kompresör, normalize, önce/sonra dinleme
