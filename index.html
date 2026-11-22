@@ -114,7 +114,22 @@ footer{border-top:1px solid var(--line);background:var(--panel)}
 #tlbar>b{font-size:13.5px;margin-right:8px}
 #tlbar button{min-height:30px;padding:4px 10px;font-size:12.5px}
 #tlbar .sp{flex:1}
-#tlScroll{overflow-x:auto;padding:0 14px 12px}
+.tlBody{display:flex;align-items:flex-start;max-height:40vh;overflow-y:auto}
+#tlHeads{flex:0 0 92px;padding:0 0 12px 14px;position:sticky;left:0}
+#tlHeads .hd{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:5px;padding-right:8px;white-space:nowrap;overflow:hidden}
+#tlHeads .hd i{font-style:normal;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;font-size:10px;color:#fff;flex:0 0 auto}
+#tlScroll{overflow-x:auto;padding:0 14px 12px 4px;flex:1;min-width:0}
+#trTexts{margin-top:0}
+#trTexts .track{margin-top:5px}
+.blk .ic{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;background:rgba(255,255,255,.25);font-size:10px;font-weight:800;margin-right:5px;vertical-align:-3px}
+.blk img.th{height:18px;width:auto;max-width:28px;border-radius:3px;margin-right:5px;vertical-align:-5px;object-fit:cover;background:rgba(255,255,255,.3)}
+.blk.t.img{background:#0f9aa0}
+.blk.t.img.sel{background:#0b7f84}
+.blk.t.sel{background:#7340d0}
+#trClips .blk{background-color:var(--clip);background-repeat:repeat-x;background-size:auto 100%;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+#trClips .blk.sel{background-color:var(--clipSel);border-color:#171a21}
+.blk .bdg{display:inline-block;margin-left:5px;padding:0 5px;border-radius:4px;background:rgba(0,0,0,.35);font-size:10px}
+#trClips:empty:after{content:"Video ya da fotoğraf eklemek için + Video / foto ekle";position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted)}
 #tl{position:relative;min-width:100%;user-select:none}
 #ruler{height:18px;position:relative;color:var(--muted);font-size:10.5px;cursor:pointer;font-variant-numeric:tabular-nums}
 #ruler i{position:absolute;top:0;height:6px;border-left:1px solid var(--line2)}
@@ -631,15 +646,18 @@ label.chk input{width:16px;flex:0 0 auto}
       <button id="tlFit" class="ghost" title="Tüm projeyi sığdır">Sığdır</button>
     </div>
   </div>
+  <div class="tlBody">
+  <div id="tlHeads"></div>
   <div id="tlScroll">
     <div id="tl">
       <div id="ruler"></div>
       <div class="track" id="trClips"></div>
-      <div class="track small" id="trTexts"></div>
+      <div id="trTexts"></div>
       <div class="track small" id="trVO"></div>
       <div class="track small" id="trMusic"></div>
       <div id="ph"></div><div id="snapLine"></div>
     </div>
+  </div>
   </div>
 </footer>
 </div>
@@ -742,12 +760,25 @@ class PhotoEl {
   _fire(n){ const hs = this._ev[n] || []; this._ev[n] = hs.filter(h => !h.once); hs.forEach(h => h.f()); }
   remove(){}
 }
+// Klip bloğu için videonun bir karesinden küçük resim (ayrı bir <video> ile; oynatmayı etkilemez)
+function makeThumb(m){
+  const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.src = m.el.src;
+  v.addEventListener('loadeddata', () => { v.currentTime = Math.min(0.5, (m.dur || 1) / 2); }, {once:true});
+  v.addEventListener('seeked', () => {
+    const c = document.createElement('canvas'); c.height = 54; c.width = Math.max(1, Math.round(54 * v.videoWidth / (v.videoHeight || 1)));
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    try { m.thumb = c.toDataURL('image/jpeg', 0.7); } catch(e){}
+    v.removeAttribute('src'); v.load(); drawTimeline();
+  }, {once:true});
+}
 async function loadMedia(blob, name, mid){
   if ((blob.type || '').startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|avif)$/i.test(name)){
     const img = new Image(); img.src = URL.createObjectURL(blob); await img.decode();
     const el = new PhotoEl(img); el.addEventListener('seeked', draw);
+    const tc = document.createElement('canvas'); tc.height = 54; tc.width = Math.max(1, Math.round(54 * img.naturalWidth / img.naturalHeight));
+    tc.getContext('2d').drawImage(img, 0, 0, tc.width, tc.height);
     mid = mid || uid++;
-    MEDIA[mid] = {mid, el, dur: 600, name, photo: true};
+    MEDIA[mid] = {mid, el, dur: 600, name, photo: true, thumb: tc.toDataURL('image/jpeg', 0.7)};
     return MEDIA[mid];
   }
   const el = document.createElement('video');
@@ -759,7 +790,8 @@ async function loadMedia(blob, name, mid){
     el.addEventListener('loadeddata', draw);
     wireEl(el);
     mid = mid || uid++;
-    MEDIA[mid] = {mid, el, dur: d, name};
+    MEDIA[mid] = {mid, el, dur: d, name, thumb: null};
+    makeThumb(MEDIA[mid]);
     return MEDIA[mid];
   } catch(e){ el.remove(); throw e; }
 }
@@ -1479,25 +1511,44 @@ function drawTimeline(){
   let h = '';
   for (let s = 0; s <= T; s += step) h += `<i style="left:${s*S.pps}px"></i><b style="left:${s*S.pps}px">${fmtT(s).replace(/\.\d+$/,'')}</b>`;
   $('ruler').innerHTML = h;
-  // klipler
+  // klipler: film şeridi gibi küçük resimli
   const off = offsets();
   $('trClips').innerHTML = '';
   S.clips.forEach((c, i) => {
     const b = document.createElement('div'); b.className = 'blk' + (c.id === S.sel ? ' sel' : '');
     b.style.left = (off[i]*S.pps) + 'px'; b.style.width = Math.max(4, len(c)*S.pps - 2) + 'px';
-    b.innerHTML = `<span></span><small>${len(c).toFixed(1)}s${c.muted?' · sessiz':''}</small>`;
+    const th = MEDIA[c.mid] && MEDIA[c.mid].thumb;
+    if (th) b.style.backgroundImage = `linear-gradient(rgba(23,26,33,.05), rgba(23,26,33,.55)), url(${th})`;
+    const extra = (c.el.isPhoto ? '<span class="bdg">foto</span>' : '') + (spd(c) !== 1 ? `<span class="bdg">${spd(c)}x</span>` : '') + (c.muted ? '<span class="bdg">sessiz</span>' : '');
+    b.innerHTML = `<span></span>${extra}<small>${len(c).toFixed(1)} sn</small>`;
     b.querySelector('span').textContent = (i+1) + '. ' + c.name;
     b.dataset.id = c.id;
     $('trClips').appendChild(b);
   });
+  // yazı ve görseller: her biri kendi satırında
   $('trTexts').innerHTML = '';
   S.texts.forEach(x => {
-    const b = document.createElement('div'); b.className = 'blk t' + (x.id === S.selText ? ' sel' : '');
+    const lane = document.createElement('div'); lane.className = 'track small';
+    const b = document.createElement('div'); const isImg = x.kind === 'img';
+    b.className = 'blk t' + (isImg ? ' img' : '') + (x.id === S.selText ? ' sel' : '');
     const e = x.end == null ? total() : x.end;
     b.style.left = (x.start*S.pps) + 'px'; b.style.width = Math.max(6, (e - x.start)*S.pps - 2) + 'px';
-    b.textContent = x.kind === 'img' ? '🖼 ' + x.name : stripMarks(x.text.replace(/\n/g,' ')); b.dataset.tid = x.id;
-    $('trTexts').appendChild(b);
+    if (isImg && IMGS[x.imgId]){ const im = document.createElement('img'); im.className = 'th'; im.src = IMGS[x.imgId].src; im.alt = ''; b.appendChild(im); }
+    else if (!isImg){ const ic = document.createElement('span'); ic.className = 'ic'; ic.textContent = 'T'; b.appendChild(ic); }
+    b.appendChild(document.createTextNode(isImg ? x.name : (stripMarks(x.text.replace(/\n/g,' ')) || '(boş)')));
+    b.dataset.tid = x.id; b.title = isImg ? 'Görsel: ' + x.name : 'Yazı';
+    lane.appendChild(b); $('trTexts').appendChild(lane);
   });
+  // boş satırları gizle
+  $('trVO').style.display = S.vo ? '' : 'none';
+  $('trMusic').style.display = S.music ? '' : 'none';
+  // sol etiketler: satır yükseklikleriyle hizalı
+  const hd = (txt, ic, col, h) => `<div class="hd" style="height:${h}px"><i style="background:${col}">${ic}</i>${txt}</div>`;
+  let heads = '<div style="height:18px"></div>' + hd('Video', '▶', 'var(--clip)', 46);
+  S.texts.forEach(x => { heads += x.kind === 'img' ? hd('Görsel', '▣', '#0f9aa0', 28) : hd('Yazı', 'T', 'var(--txtClip)', 28); });
+  if (S.vo) heads += hd('Ses', '●', '#f08a3c', 28);
+  if (S.music) heads += hd('Müzik', '♪', '#22a06b', 28);
+  $('tlHeads').innerHTML = heads;
   // müzik şeridi
   $('trMusic').innerHTML = '';
   if (S.music){
