@@ -319,7 +319,21 @@ label.chk input{width:16px;flex:0 0 auto}
         <div id="ciAudio">
         <label>Klip sesi <span id="ciVolV">100%</span></label>
         <div class="row"><input type="range" id="ciVol" min="0" max="200" value="100"><button class="auto" id="ciMute">Sessiz</button></div>
+        <button id="ciSil" style="width:100%;margin-top:8px">✂ Sessiz yerleri kes</button>
+        <p class="hint">Konuşma videolarında duraklamaları otomatik çıkarır (jump cut). Klip parçalara bölünür.</p>
         </div>
+        <label>Kamera hareketi</label>
+        <div class="opts opts3" id="ciMove">
+          <button data-m="none"><b>Yok</b><small>Sabit</small></button>
+          <button data-m="pushIn"><b>Yakınlaş</b><small>Yavaşça içeri</small></button>
+          <button data-m="pullOut"><b>Uzaklaş</b><small>Yavaşça dışarı</small></button>
+          <button data-m="punch"><b>Zoom vuruşu</b><small>Başta ani zoom</small></button>
+          <button data-m="panL"><b>Sola kay</b><small>Yatay kaydırma</small></button>
+          <button data-m="panR"><b>Sağa kay</b><small>Yatay kaydırma</small></button>
+          <button data-m="handheld"><b>El kamerası</b><small>Hafif sallantı</small></button>
+          <button data-m="shake"><b>Titreme</b><small>Güçlü sarsıntı</small></button>
+        </div>
+        <button id="ciMoveAll" style="width:100%;margin-top:8px">Hareketi tüm kliplere uygula</button>
         <div hidden><label>Sıralama etiketi</label>
         <input type="text" id="ciLabel" placeholder="ör. En hızlı araba"></div>
       </div>
@@ -641,6 +655,19 @@ label.chk input{width:16px;flex:0 0 auto}
       </div>
       <label>Yakınlaştırma <span id="zoomV">100%</span></label>
       <input type="range" id="zoom" min="100" max="200" value="100">
+      <h3 style="margin-top:12px">Efektler</h3>
+      <div class="opts opts3" id="ofxBtns">
+        <button data-o="grain"><b>Film greni</b><small>Analog doku</small></button>
+        <button data-o="vhs"><b>VHS</b><small>Eski kaset</small></button>
+        <button data-o="rgb"><b>RGB kayması</b><small>Renk ayrışması</small></button>
+        <button data-o="bars"><b>Sinema bantları</b><small>Üst ve alt siyah</small></button>
+        <button data-o="prog"><b>İlerleme çubuğu</b><small>Sonuna kadar izlensin</small></button>
+      </div>
+      <div id="progOpts" class="row" style="display:none;margin-top:6px;align-items:flex-end">
+        <div><label>Çubuk konumu</label><select id="progPos"><option value="top">Üstte</option><option value="bottom">Altta</option></select></div>
+        <div><label>Renk</label><input type="color" id="progColor" value="#ff2d55"></div>
+      </div>
+      <p class="hint">İstediğin kadarını aç. Önizlemede ve dışa aktarılan videoda görünür.</p>
       <h3 style="margin-top:12px">Güvenli alan</h3>
       <select id="safeZone">
         <option value="">Kapalı</option>
@@ -736,7 +763,8 @@ const FORMATS = {'9:16':[1080,1920],'4:5':[1080,1350],'1:1':[1080,1080],'16:9':[
 
 const S = {
   clips: [], texts: [], vo: null,
-  transType:'none', transDur:1, music:null, filter:'none', filterAmt:1, vig:0,
+  transType:'none', transDur:1,
+  ofx:{grain:false, vhs:false, rgb:false, bars:false, prog:false, progPos:'top', progColor:'#ff2d55'}, music:null, filter:'none', filterAmt:1, vig:0,
   subs:{items:[], style:{preset:'karaoke', font:'Montserrat', size:76, color:'#ffffff', hl:'#ffd400', upper:true, words:4, x:0.5, y:0.72}},
   fmt:'9:16', fit:'blur', blurAmt:0.6, bgDim:0.2, safe:'', bg:'#000000', zoom:1, bright:100, contrast:100, sat:100, master:1, voVol:1,
   duck:{on:true, lvl:0.25},
@@ -890,6 +918,56 @@ $('bAdd').onclick = () => $('fileVideo').click();
 $('transBtns').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.transType = b.dataset.tr;
   $('transBtns').querySelectorAll('button').forEach(o => o.classList.toggle('on', o === b));
   if (S.clips.length < 2 && S.transType !== 'none') toast('Geçiş, iki klibin birleştiği yerde görünür'); draw(); };
+// efektler
+function syncOfx(){ const o = S.ofx;
+  $('ofxBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', !!o[b.dataset.o]));
+  $('progOpts').style.display = o.prog ? 'flex' : 'none'; $('progPos').value = o.progPos; $('progColor').value = o.progColor; }
+$('ofxBtns').onclick = e => { const b = e.target.closest('button'); if (!b) return; const k = b.dataset.o;
+  S.ofx = {...S.ofx, [k]: !S.ofx[k]}; syncOfx(); draw(); };
+$('progPos').onchange = e => { S.ofx = {...S.ofx, progPos: e.target.value}; draw(); };
+$('progColor').oninput = e => { S.ofx = {...S.ofx, progColor: e.target.value}; draw(); };
+// kamera hareketi
+$('ciMove').onclick = e => { const b = e.target.closest('button'); if (!b) return; withSel(c => { c.move = b.dataset.m; }); draw(); };
+$('ciMoveAll').onclick = () => withSel(c => { const m = c.move || 'none'; S.clips.forEach(o => o.move = m); toast(`Hareket ${S.clips.length} klibe uygulandı`); });
+// sessiz yerleri kes: ses seviyesini 20 ms'lik pencerelerle ölç, uzun sessizlikleri çıkar
+async function cutSilence(c){
+  if (c.el.isPhoto) return;
+  $('ciSil').disabled = true; $('ciSil').textContent = 'Ses inceleniyor…';
+  try {
+    let buf;
+    try { const ab = await fetch(c.el.src).then(r => r.arrayBuffer()); buf = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(ab); }
+    catch(e){ return toast('Bu klipte okunabilir ses yok'); }
+    const sr = buf.sampleRate, data = buf.getChannelData(0), step = 0.02, win = Math.round(sr*step);
+    const i0 = Math.floor(c.in*sr), i1 = Math.min(data.length, Math.floor(c.out*sr)), db = [];
+    for (let i = i0; i + win <= i1; i += win){ let s = 0; for (let j = i; j < i + win; j++) s += data[j]*data[j]; db.push(10*Math.log10(s/win + 1e-12)); }
+    if (db.length < 25) return toast('Klip çok kısa');
+    const loud = [...db].sort((a, b) => a - b)[Math.floor(db.length*0.9)];
+    if (loud < -50) return toast('Klipte konuşma bulunamadı');
+    const thr = Math.max(-55, loud - 24), minSil = 0.45, pad = 0.12, cuts = [];
+    for (let a = 0; a < db.length;){
+      if (db[a] >= thr){ a++; continue; }
+      let b = a; while (b < db.length && db[b] < thr) b++;
+      if ((b - a)*step >= minSil){
+        const from = a === 0 ? c.in : c.in + a*step + pad, to = b >= db.length ? c.out : c.in + b*step - pad;
+        if (to - from > 0.15) cuts.push([from, to]);
+      }
+      a = b;
+    }
+    if (!cuts.length) return toast('Kesilecek uzun sessizlik bulunamadı');
+    const keep = []; let p = c.in;
+    for (const [f, t] of cuts){ if (f - p > 0.1) keep.push([p, f]); p = t; }
+    if (c.out - p > 0.1) keep.push([p, c.out]);
+    if (!keep.length) return toast('Klipte konuşma bulunamadı');
+    captureNow();
+    const before = c.out - c.in, i = S.clips.indexOf(c);
+    const parts = keep.map(([a, b], j) => j === 0 ? Object.assign(c, {in: a, out: b}) : {...c, id: uid++, in: a, out: b, trans: 'none', label: ''});
+    S.clips.splice(i, 1, ...parts); S.sel = c.id;
+    const saved = before - keep.reduce((s, [a, b]) => s + b - a, 0);
+    refresh(); seek(offsets()[i] + 0.001); captureNow();
+    toast(`${cuts.length} sessiz yer kesildi · kaynakta ${saved.toFixed(1)} sn kısaldı`);
+  } finally { $('ciSil').disabled = false; $('ciSil').textContent = '✂ Sessiz yerleri kes'; }
+}
+$('ciSil').onclick = () => { const c = selClip(); if (!c) return toast('Önce klip seç'); cutSilence(c); };
 $('ciTrans').onchange = e => withSel(c => { c.trans = e.target.value; seek(offsets()[S.clips.indexOf(c)] + 0.001); });
 // hazır edit stilleri: tüm kliplere hız + geçiş + renk
 const STYLES = {
@@ -1084,6 +1162,7 @@ function draw(){
     if (S.t >= x.start && (S.t < end || (end === Infinity))) (x.kind === 'img' ? drawImgLayer : drawText)(x, W, H);
   }
   drawSubs(W, H);
+  drawProgress(W, H);
   if (S.safe && !S.exporting && !S.fullRes) drawSafe(W, H);
   $('empty').style.display = S.clips.length ? 'none' : 'flex';
 }
@@ -1187,6 +1266,18 @@ function drawVideo(c, W, H){
   const look = `brightness(${S.bright}%) contrast(${S.contrast}%) saturate(${S.sat}%)` + filterCss();
   let r = videoRect(c, W, H); const gaps = r.x > 0.5 || r.y > 0.5 || r.x + r.w < W - 0.5 || r.y + r.h < H - 0.5;
   const src = c.el.img || c.el, s = srcRect(c);
+  const mv = c.move || 'none';
+  if (mv !== 'none'){ // kamera hareketi: klip ilerledikçe yakınlaş / kay / salla
+    const ct = c.el.currentTime, u = clamp((ct - c.in) / Math.max(0.1, c.out - c.in), 0, 1), sec = Math.max(0, ct - c.in) / spd(c);
+    let z = 1, dx = 0, dy = 0;
+    if (mv === 'pushIn') z = 1 + 0.18*ease(u);
+    else if (mv === 'pullOut') z = 1.18 - 0.18*ease(u);
+    else if (mv === 'punch') z = 1.06 + 0.28*(1 - ease(Math.min(1, sec/0.35)));
+    else if (mv === 'panL' || mv === 'panR'){ z = 1.16; dx = (mv === 'panL' ? 1 : -1) * (1 - 2*ease(u)) * r.w*0.08; }
+    else if (mv === 'handheld'){ z = 1.07; dx = (Math.sin(ct*1.3) + 0.5*Math.sin(ct*3.1)) * r.w*0.008; dy = (Math.cos(ct*1.1) + 0.5*Math.sin(ct*2.7)) * r.h*0.006; }
+    else if (mv === 'shake'){ z = 1.12; dx = (Math.sin(ct*37) + Math.sin(ct*23)) * r.w*0.012; dy = (Math.cos(ct*31) + Math.sin(ct*19)) * r.h*0.008; }
+    r = {...r, x: r.x - r.w*(z-1)/2 + dx, y: r.y - r.h*(z-1)/2 + dy, w: r.w*z, h: r.h*z};
+  }
   if (c.el.isPhoto && c.kb !== false){ // yavaş yakınlaşma: klip boyunca %0 → %10
     const z = 1 + 0.1 * clamp((c.el.currentTime - c.in) / Math.max(0.1, c.out - c.in), 0, 1);
     r = {...r, x: r.x - r.w*(z-1)/2, y: r.y - r.h*(z-1)/2, w: r.w*z, h: r.h*z};
@@ -1217,6 +1308,7 @@ function drawVideo(c, W, H){
   blit(ctx, src, s, r.x, r.y, r.w, r.h);
   ctx.filter = 'none';
   filterOverlay(W, H);
+  drawOfx(W, H);
   if (gaps && (S.fit === 'blur' || S.fit === 'mirror')){
     // video kenarına ince gölge: arka plandan ayrışsın
     ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = W*0.02; ctx.strokeStyle = 'rgba(0,0,0,.01)';
@@ -1240,6 +1332,52 @@ function filterCss(){
   const f = FILTERS[S.filter] || {}, k = S.filterAmt; if (!k || S.filter === 'none') return '';
   return ` contrast(${lerp(1, f.con ?? 1, k).toFixed(3)}) saturate(${lerp(1, f.sat ?? 1, k).toFixed(3)}) brightness(${lerp(1, f.bri ?? 1, k).toFixed(3)})`
     + (f.sepia ? ` sepia(${(f.sepia*k).toFixed(3)})` : '') + (f.gray ? ` grayscale(${(f.gray*k).toFixed(3)})` : '') + (f.hue ? ` hue-rotate(${(f.hue*k).toFixed(1)}deg)` : '');
+}
+// ---------- efekt katmanları ----------
+const fxCv = document.createElement('canvas'), fxCtx = fxCv.getContext('2d');
+const GRAINS = [0,1,2,3].map(() => { const g = document.createElement('canvas'); g.width = g.height = 160; const x = g.getContext('2d'), d = x.createImageData(160, 160);
+  for (let i = 0; i < d.data.length; i += 4){ const v = Math.random()*255; d.data[i] = d.data[i+1] = d.data[i+2] = v; d.data[i+3] = 255; } x.putImageData(d, 0, 0); return g; });
+const scanCv = (() => { const g = document.createElement('canvas'); g.width = 2; g.height = 4; const x = g.getContext('2d'); x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(0, 0, 2, 1); return g; })();
+function rgbSplit(W, H, off){ // kırmızı kanalı yana kaydır
+  if (fxCv.width !== cv.width || fxCv.height !== cv.height){ fxCv.width = cv.width; fxCv.height = cv.height; }
+  fxCtx.globalCompositeOperation = 'copy'; fxCtx.drawImage(cv, 0, 0);
+  fxCtx.globalCompositeOperation = 'multiply'; fxCtx.fillStyle = '#ff0000'; fxCtx.fillRect(0, 0, fxCv.width, fxCv.height);
+  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = '#00ffff'; ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(fxCv, off, 0, W, H); ctx.restore();
+}
+function drawOfx(W, H){
+  const o = S.ofx; if (!o) return;
+  if (o.rgb) rgbSplit(W, H, W*0.007*(1 + 0.4*Math.sin(S.t*9)));
+  if (o.vhs){
+    rgbSplit(W, H, W*0.004);
+    ctx.save();
+    ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.35; ctx.fillStyle = '#ffb36b'; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 0.35;
+    const pat = ctx.createPattern(scanCv, 'repeat'); ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H);
+    // kayan bozuk şerit
+    const by = ((S.t * 0.23) % 1.2 - 0.1) * H, bh = H*0.035;
+    ctx.globalAlpha = 0.5; ctx.drawImage(cv, 0, by*cv.height/H, cv.width, bh*cv.height/H, W*0.02, by, W, bh);
+    ctx.globalAlpha = 0.12; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, by, W, bh*0.25);
+    ctx.globalAlpha = 0.9; ctx.fillStyle = '#ffffff'; ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = W*0.006;
+    ctx.font = `bold ${Math.round(W*0.042)}px "Courier New", monospace`; ctx.textBaseline = 'top';
+    ctx.fillText('PLAY ▶', W*0.06, H*0.05);
+    const t = S.t, hh = String(Math.floor(t/3600)).padStart(2,'0'), mm = String(Math.floor(t/60)%60).padStart(2,'0'), ss = String(Math.floor(t)%60).padStart(2,'0');
+    ctx.textAlign = 'right'; ctx.fillText(`${hh}:${mm}:${ss}`, W*0.94, H*0.05);
+    ctx.restore();
+  }
+  if (o.grain){
+    ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = 0.22;
+    const pat = ctx.createPattern(GRAINS[Math.floor(Math.random()*4)], 'repeat');
+    const sc = W/540; pat.setTransform(new DOMMatrix([sc, 0, 0, sc, Math.random()*160, Math.random()*160]));
+    ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); ctx.restore();
+  }
+  if (o.bars){ const b = H * (W < H ? 0.1 : 0.12); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, b); ctx.fillRect(0, H - b, W, b); }
+}
+function drawProgress(W, H){
+  const o = S.ofx; if (!o || !o.prog || !S.clips.length) return;
+  const T = total(), p = T ? clamp(S.t / T, 0, 1) : 0, h = Math.max(6, Math.round(H*0.007)), y = o.progPos === 'bottom' ? H - h : 0;
+  ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(0, y, W, h);
+  ctx.fillStyle = o.progColor || '#ff2d55'; ctx.fillRect(0, y, W*p, h); ctx.restore();
 }
 function filterOverlay(W, H){
   const f = FILTERS[S.filter] || {}, k = S.filter === 'none' ? 0 : S.filterAmt;
@@ -1582,6 +1720,7 @@ function refresh(){
     $('ciName').textContent = c.el.isPhoto ? `${c.name} · fotoğraf` : `${c.name} · kaynak ${c.dur.toFixed(2)} sn`;
     $('ciSpeedBox').style.display = c.el.isPhoto ? 'none' : 'block';
     $('ciTransBox').style.display = S.clips.indexOf(c) > 0 ? 'block' : 'none'; $('ciTrans').value = c.trans || 'auto';
+    $('ciMove').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === (c.move || 'none')));
     const rp = rampOf(c);
     $('ciSpeedV').textContent = `${+spd(c).toFixed(2)}x${rp !== 'none' ? ' · eğrili' : ''} · süre ${len(c).toFixed(1)} sn (kaynak ${(c.out - c.in).toFixed(1)} sn)`;
     $('ciSpeed').querySelectorAll('button').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.s - spd(c)) < 1e-6));
@@ -2598,12 +2737,12 @@ const store = (() => {
 })();
 
 // ---------- proje durumu: kaydet / geri yükle / geri al ----------
-const LOOK = ['filter','filterAmt','vig','transType','transDur','fmt','fit','blurAmt','bgDim','safe','bg','zoom','bright','contrast','sat','master','voVol'];
+const LOOK = ['ofx','filter','filterAmt','vig','transType','transDur','fmt','fit','blurAmt','bgDim','safe','bg','zoom','bright','contrast','sat','master','voVol'];
 function snapshot(){
   const o = {v:1};
   for (const k of LOOK) o[k] = S[k];
   o.duck = {...S.duck};
-  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1, ramp:c.ramp || 'none', crop:cropOf(c), trans:c.trans || 'auto'}; });
+  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1, ramp:c.ramp || 'none', crop:cropOf(c), trans:c.trans || 'auto', move:c.move || 'none'}; });
   o.texts = S.texts.map(({_bb, ...x}) => x);
   o.music = S.music ? {aid:S.music.aid, name:S.music.name, vol:S.music.vol, start:S.music.start, loop:S.music.loop, fadeIn:S.music.fadeIn, fadeOut:S.music.fadeOut, duck:S.music.duck} : null;
   o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
@@ -2613,6 +2752,7 @@ function snapshot(){
 }
 function setRange(id, val, txt){ const e = $(id); if (!e) return; e.value = val; const l = $(id+'V'); if (l) l.textContent = txt; }
 function syncControls(){
+  syncOfx();
   $('fmtBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.fmt === S.fmt));
   $('fitBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.fit === S.fit));
   setRange('blurAmt', Math.round(S.blurAmt*100), Math.round(S.blurAmt*100)+'%');
