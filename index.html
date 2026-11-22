@@ -252,10 +252,11 @@ label.chk input{width:auto;flex:0 0 auto}
         <label>Metin</label>
         <textarea id="txText"></textarea>
         <div class="row" style="margin-top:6px;align-items:center">
-          <button id="txHlBtn" title="Metinde seçtiğin kelimeleri vurgu rengine boya">Seçili kelimeyi renklendir</button>
-          <input type="color" id="txHl" title="Vurgu rengi" style="flex:0 0 auto">
+          <input type="color" id="txHl" title="Kelime rengi" style="flex:0 0 auto">
+          <button id="txHlBtn" title="Metinde seçtiğin kelimeleri soldaki renge boya">Seçili kelimeyi renklendir</button>
+          <button id="txHlClear" title="Bu yazıdaki tüm kelime renklerini kaldır" style="flex:0 0 auto">Temizle</button>
         </div>
-        <p class="hint">Kelimeyi seç, butona bas. Ya da <b>*kelime*</b> diye yıldız içine yaz.</p>
+        <p class="hint">Renk seç, kelimeyi seç, butona bas. Her kelime farklı renk olabilir. Aynı renkle tekrar basarsan renk kalkar.</p>
         <div class="row">
           <div><label>Font</label>
             <select id="txFont">
@@ -603,19 +604,27 @@ function drawRank(c, W, H){
     ctx.strokeText(c.label, lx, cy); ctx.fillStyle = '#fff'; ctx.fillText(c.label, lx, cy);
   }
 }
-// Metni kelimelere böl; *yıldız* arası vurgu rengi (birden çok kelimeyi kapsayabilir)
-function tokens(text){
-  const paras = []; let hl = false;
+// Metni kelimelere böl. Renk işaretleri (birden çok kelimeyi kapsayabilir):
+//   {#ff0000:kelimeler}  → o renk (her parça kendi rengini taşır)
+//   *kelimeler*          → yazının vurgu rengi (eski yöntem)
+const COLOR_OPEN = /^\{(#[0-9a-fA-F]{6}):/;
+const stripMarks = t => String(t).replace(/\{#[0-9a-fA-F]{6}:/g, '').replace(/[*}]/g, '');
+function tokens(text, hl){
+  const paras = []; let col = null, mode = null; // mode: 'brace' | 'star'
   for (const para of String(text).split('\n')){
     const words = [];
     for (const raw of para.split(/\s+/)){
       if (!raw) continue;
       const pieces = []; let buf = '';
-      for (const ch of raw){
-        if (ch === '*'){ if (buf) pieces.push({t:buf, hl}); buf = ''; hl = !hl; }
+      const flush = () => { if (buf) pieces.push({t:buf, col}); buf = ''; };
+      for (let i = 0; i < raw.length; i++){
+        const ch = raw[i], m = ch === '{' ? COLOR_OPEN.exec(raw.slice(i)) : null;
+        if (m){ flush(); col = m[1]; mode = 'brace'; i += m[0].length - 1; }
+        else if (ch === '}' && mode === 'brace'){ flush(); col = null; mode = null; }
+        else if (ch === '*' && mode !== 'brace'){ flush(); if (mode === 'star'){ col = null; mode = null; } else { col = hl || '#ffd400'; mode = 'star'; } }
         else buf += ch;
       }
-      if (buf) pieces.push({t:buf, hl});
+      flush();
       if (pieces.length) words.push(pieces);
     }
     paras.push(words);
@@ -623,9 +632,9 @@ function tokens(text){
   return paras;
 }
 const wordW = w => w.reduce((a,p) => a + ctx.measureText(p.t).width, 0);
-function layout(text, maxW){
+function layout(text, maxW, hl){
   const sp = ctx.measureText(' ').width, out = [];
-  for (const words of tokens(text)){
+  for (const words of tokens(text, hl)){
     let line = [], lw = 0;
     for (const w of words){
       const ww = wordW(w), nw = line.length ? lw + sp + ww : ww;
@@ -640,7 +649,7 @@ function drawText(x, W, H){
   const weight = (x.font === 'Montserrat') ? '800 ' : (x.font === 'Poppins' ? '700 ' : '');
   ctx.font = `${weight}${x.size}px "${x.font}", Impact, sans-serif`;
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  const {lines, sp} = layout(x.text, W*0.88), lh = x.size * 1.12;
+  const {lines, sp} = layout(x.text, W*0.88, x.hl), lh = x.size * 1.12;
   const y0 = H * x.y - (lines.length-1) * lh / 2;
   const CX = W * (x.x == null ? 0.5 : x.x);
   const mw = Math.max(0, ...lines.map(l => l.w)), pad = x.size*0.3;
@@ -663,7 +672,7 @@ function drawText(x, W, H){
         if (wi) cx += sp;
         for (const p of w){
           if (pass === 'stroke'){ ctx.lineWidth = x.strokeW*2; ctx.strokeStyle = x.stroke; ctx.strokeText(p.t, cx, y); }
-          else { ctx.fillStyle = p.hl ? (x.hl || '#ffd400') : x.color; ctx.fillText(p.t, cx, y); }
+          else { ctx.fillStyle = p.col || x.color; ctx.fillText(p.t, cx, y); }
           cx += ctx.measureText(p.t).width;
         }
       });
@@ -716,7 +725,7 @@ function refresh(){
   S.texts.forEach(x => {
     const d = document.createElement('div'); d.className = 'item' + (x.id === S.selText ? ' sel' : '');
     d.innerHTML = `<span class="nm"></span><span class="mono">${x.start.toFixed(1)}–${x.end==null?'son':x.end.toFixed(1)}</span>`;
-    d.querySelector('.nm').textContent = x.text.replace(/\n/g,' ').replace(/\*/g,'') || '(boş)';
+    d.querySelector('.nm').textContent = stripMarks(x.text.replace(/\n/g,' ')) || '(boş)';
     d.onclick = () => { S.selText = x.id; refresh(); };
     $('textList').appendChild(d);
   });
@@ -762,7 +771,7 @@ function drawTimeline(){
     const b = document.createElement('div'); b.className = 'blk t' + (x.id === S.selText ? ' sel' : '');
     const e = x.end == null ? total() : x.end;
     b.style.left = (x.start*S.pps) + 'px'; b.style.width = Math.max(6, (e - x.start)*S.pps - 2) + 'px';
-    b.textContent = x.text.replace(/\n/g,' '); b.dataset.tid = x.id;
+    b.textContent = stripMarks(x.text.replace(/\n/g,' ')); b.dataset.tid = x.id;
     $('trTexts').appendChild(b);
   });
   // seslendirme şeridi
@@ -868,7 +877,7 @@ $('txText').oninput = tx((x,e) => x.text = e.target.value);
 $('txFont').onchange = tx((x,e) => { x.font = e.target.value; loadFont(x.font); });
 $('txSize').oninput = tx((x,e) => x.size = +e.target.value);
 $('txColor').oninput = tx((x,e) => x.color = e.target.value);
-$('txHl').oninput = tx((x,e) => x.hl = e.target.value);
+$('txHl').oninput = e => { const x = selTxt(); if (x) x.hl = e.target.value; };
 $('txHlBtn').onclick = () => {
   const x = selTxt(); if (!x) return;
   const ta = $('txText'); let a = ta.selectionStart, b = ta.selectionEnd, v = ta.value;
@@ -878,11 +887,18 @@ $('txHlBtn').onclick = () => {
     while (b < v.length && !/\s/.test(v[b])) b++;
     if (a === b) return toast('Önce metinde bir kelime seç');
   }
-  const part = v.slice(a, b);
-  const rep = /^\*[\s\S]*\*$/.test(part) && part.length > 1 ? part.slice(1, -1) : '*' + part.replace(/\*/g,'') + '*';
+  // seçim bir renk bloğunun içindeyse bloğu tamamen kapsayacak şekilde genişlet
+  const blk = /\{#[0-9a-fA-F]{6}:[^}]*\}|\*[^*]*\*/g; let m;
+  while ((m = blk.exec(v))){ const s0 = m.index, e0 = s0 + m[0].length; if (a < e0 && b > s0){ a = Math.min(a, s0); b = Math.max(b, e0); } }
+  const part = v.slice(a, b), plain = stripMarks(part);
+  const col = $('txHl').value;
+  const same = new RegExp('^\\{' + col + ':[^}]*\\}$', 'i').test(part);
+  const rep = same ? plain : '{' + col + ':' + plain + '}';
   ta.value = v.slice(0, a) + rep + v.slice(b); x.text = ta.value;
   ta.focus(); ta.setSelectionRange(a, a + rep.length); refresh();
+  toast(same ? 'Renk kaldırıldı' : 'Renk uygulandı');
 };
+$('txHlClear').onclick = () => { const x = selTxt(); if (!x) return; x.text = stripMarks(x.text); $('txText').value = x.text; refresh(); toast('Tüm kelime renkleri temizlendi'); };
 $('txStroke').oninput = tx((x,e) => x.stroke = e.target.value);
 $('txStrokeW').oninput = tx((x,e) => x.strokeW = clamp(+e.target.value||0, 0, 30));
 $('txY').oninput = tx((x,e) => x.y = e.target.value/100);

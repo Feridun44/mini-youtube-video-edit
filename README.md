@@ -22,7 +22,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 
 - **Video:** sürükle-bırak yükleme, birden çok klip, kırpma, bölme, sıralama, klip başına ses
 - **Format:** 9:16 (Reels/Shorts), 4:5, 1:1
-- **Yazı:** font, boyut, renk, kenarlık, önizlemede sürükleyerek taşıma, kelime bazlı vurgu rengi (`*kelime*`)
+- **Yazı:** font, boyut, renk, kenarlık, önizlemede sürükleyerek taşıma, her kelimeye ayrı renk (kelimeyi seç → renk seç → "Seçili kelimeyi renklendir")
 - **Görüntü:** parlaklık, kontrast, doygunluk, yakınlaştırma
 - **Seslendirme:** geri sayımlı mikrofon kaydı, seviye göstergesi, dalga görünümü, kırpma, kaydırma, açılış/kapanış geçişi
 - **Ses iyileştirme:** uğultu temizleme, gürültü kapısı, EQ, kompresör, normalize, önce/sonra dinleme
