@@ -114,6 +114,7 @@ footer{border-top:1px solid var(--line);background:var(--panel)}
 #tlbar>b{font-size:13.5px;margin-right:8px}
 #tlbar button{min-height:30px;padding:4px 10px;font-size:12.5px}
 #tlbar .sp{flex:1}
+#tlSpeed{width:auto;min-height:30px;padding:3px 8px;font-size:12.5px;font-weight:600}
 .tlBody{display:flex;align-items:flex-start;max-height:40vh;overflow-y:auto}
 #tlHeads{flex:0 0 92px;padding:0 0 12px 14px;position:sticky;left:0}
 #tlHeads .hd{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:5px;padding-right:8px;white-space:nowrap;overflow:hidden}
@@ -273,7 +274,21 @@ label.chk input{width:16px;flex:0 0 auto}
           <div class="row" id="ciSpeed" style="flex-wrap:wrap;gap:4px">
             <button data-s="0.25">0.25x</button><button data-s="0.5">0.5x</button><button data-s="0.75">0.75x</button><button data-s="1">1x</button><button data-s="1.5">1.5x</button><button data-s="2">2x</button><button data-s="3">3x</button>
           </div>
-          <p class="hint">1x altı ağır çekim, üstü hızlandırma. Ses perdesi korunur.</p>
+          <input type="range" id="ciSpeedR" min="-332" max="232" step="1" aria-label="Serbest hız (0.1x – 5x)" style="margin-top:8px">
+          <div class="row" style="align-items:flex-end">
+            <div><label>Hedef süre (sn)</label><input type="number" id="ciTarget" min="0.1" step="0.1" placeholder="ör. 5"></div>
+            <button id="ciTargetGo" class="auto" title="Klibi bu süreye sığacak şekilde hızlandır/yavaşlat">Sığdır</button>
+          </div>
+          <label>Hız eğrisi</label>
+          <div class="opts opts3" id="ciRamp">
+            <button data-r="none"><b>Sabit</b><small>Tek hız</small></button>
+            <button data-r="slowIn"><b>Yavaş başla</b><small>Giderek hızlanır</small></button>
+            <button data-r="slowOut"><b>Yavaş bitir</b><small>Sona doğru ağır çekim</small></button>
+            <button data-r="slowMid"><b>Ortası ağır</b><small>Hızlı · ağır · hızlı</small></button>
+            <button data-r="fastMid"><b>Ortası hızlı</b><small>Ağır · hızlı · ağır</small></button>
+          </div>
+          <button id="ciSpeedAll" style="width:100%;margin-top:8px" title="Bu hızı ve eğriyi tüm video kliplerine uygula">Tüm kliplere uygula</button>
+          <p class="hint">Hız değişince klibin süresi de kısalır ya da uzar. Ses perdesi korunur; 4x üstünde tarayıcı sesi kısabilir.</p>
         </div>
         <div id="ciAudio">
         <label>Klip sesi <span id="ciVolV">100%</span></label>
@@ -635,6 +650,9 @@ label.chk input{width:16px;flex:0 0 auto}
     <button id="bSplit" title="Oynatma çubuğundan böl (S)">✂ Böl</button>
     <button id="bLeft" title="Seçili klibi sola taşı">← Sola</button>
     <button id="bRight" title="Seçili klibi sağa taşı">Sağa →</button>
+    <select id="tlSpeed" title="Seçili klibin hızı" aria-label="Seçili klibin hızı">
+      <option value="">Hız</option><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1">1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option>
+    </select>
     <button id="bDel" class="danger" title="Seçili öğeyi sil (Delete) · Esc: seçimi bırak">Sil</button>
     <button id="bDup" title="Seçili klibi çoğalt" hidden>Çoğalt</button>
     <span class="sp"></span>
@@ -698,7 +716,31 @@ const fmtT = s => { s = Math.max(0, s||0); const m = Math.floor(s/60); const r =
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
 const toast = msg => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 1800); };
 const spd = c => (c.el && c.el.isPhoto) ? 1 : (c.speed || 1);
-const len = c => Math.max(0, (c.out - c.in) / spd(c));
+// Hız eğrileri: klibin kaynak ilerlemesine (0..1) göre hız çarpanı
+const RAMPS = {
+  none:     u => 1,
+  slowIn:   u => lerp(0.35, 1.7, (1 - Math.cos(Math.PI*u))/2),          // yavaş başla, hızlan
+  slowOut:  u => lerp(1.7, 0.35, (1 - Math.cos(Math.PI*u))/2),          // hızlı başla, yavaşla
+  slowMid:  u => lerp(1.8, 0.3, (1 - Math.cos(2*Math.PI*u))/2),         // ortası ağır çekim
+  fastMid:  u => lerp(0.5, 2.4, (1 - Math.cos(2*Math.PI*u))/2),         // ortası hızlı
+};
+const rampOf = c => (c.el && c.el.isPhoto) ? 'none' : (c.ramp || 'none');
+// Klibin "kaynak süresi ↔ zaman çizelgesi süresi" eşlemesi; eğri varsa tablo ile (önbellekli)
+function mapOf(c){
+  const Ls = Math.max(0.001, c.out - c.in), v = spd(c), r = rampOf(c);
+  if (r === 'none') return {total: Ls / v, toSrc: t => t * v, toLocal: s => s / v, rate: () => v};
+  const key = `${Ls}|${v}|${r}`; if (c._map && c._map.key === key) return c._map;
+  const N = 240, f = RAMPS[r] || RAMPS.none, ts = new Float64Array(N + 1);
+  for (let k = 0; k < N; k++){ const u = (k + 0.5)/N; ts[k+1] = ts[k] + (Ls/N) / (v * f(u)); }
+  const total = ts[N];
+  const toLocal = s => { const x = clamp(s / Ls, 0, 1) * N, k = Math.min(N - 1, Math.floor(x)); return ts[k] + (ts[k+1] - ts[k]) * (x - k); };
+  const toSrc = t => { t = clamp(t, 0, total); let lo = 0, hi = N; while (hi - lo > 1){ const m = (lo + hi) >> 1; if (ts[m] <= t) lo = m; else hi = m; }
+    return (lo + (t - ts[lo]) / Math.max(1e-9, ts[lo+1] - ts[lo])) / N * Ls; };
+  const rate = s => v * f(clamp(s / Ls, 0, 1));
+  return c._map = {key, total, toSrc, toLocal, rate};
+}
+const len = c => Math.max(0, mapOf(c).total);
+const lerp = (a, b, k) => a + (b - a) * k;
 const total = () => S.clips.reduce((a,c)=>a+len(c), 0);
 const offsets = () => { let o = 0; return S.clips.map(c => { const r = o; o += len(c); return r; }); };
 function locate(t){
@@ -828,8 +870,8 @@ function startClip(i, local){
   S.cur = i; const c = S.clips[i];
   for (const o of S.clips) if (o.el !== c.el && !o.el.paused) o.el.pause();
   applyClipGain(c);
-  const target = c.in + local * spd(c);
-  if (!c.el.isPhoto){ c.el.playbackRate = spd(c); c.el.preservesPitch = true; }
+  const m = mapOf(c), target = c.in + m.toSrc(local);
+  if (!c.el.isPhoto){ c.el.playbackRate = clamp(m.rate(target - c.in), 0.0625, 16); c.el.preservesPitch = true; }
   if (Math.abs(c.el.currentTime - target) > 0.03) c.el.currentTime = target;
   // Dışa aktarmada yeni klip oynamaya başlayana kadar kaydı duraklat: donmuş kare yazılmasın
   const ex = S.exporting;
@@ -876,7 +918,7 @@ function seek(t){
   if (!S.clips.length){ draw(); updTime(); return; }
   const {i, local} = locate(S.t);
   if (S.playing){ startClip(i, local); syncVO(); musicTick(true); }
-  else { S.cur = i; const c = S.clips[i]; c.el.currentTime = clamp(c.in + local * spd(c), 0, c.dur - 0.001); }
+  else { S.cur = i; const c = S.clips[i]; c.el.currentTime = clamp(c.in + mapOf(c).toSrc(local), 0, c.dur - 0.001); }
   draw(); updTime();
 }
 function tick(){
@@ -884,7 +926,9 @@ function tick(){
     const off = offsets(); let c = S.clips[S.cur];
     if (!c){ stop(); }
     else {
-      S.t = off[S.cur] + (c.el.currentTime - c.in) / spd(c);
+      const mp = mapOf(c), sNow = c.el.currentTime - c.in;
+      S.t = off[S.cur] + mp.toLocal(sNow);
+      if (!c.el.isPhoto && rampOf(c) !== 'none') c.el.playbackRate = clamp(mp.rate(sNow), 0.0625, 16);
       if (c.el.currentTime >= c.out - 0.03 || c.el.ended){
         if (S.cur < S.clips.length - 1){ startClip(S.cur + 1, 0); S.t = off[S.cur]; }
         else { S.t = total(); stop(); if (S.exporting) finishExport(); }
@@ -1098,7 +1142,6 @@ const FILTERS = {
   drama:   {con:1.35, sat:0.8,  bri:0.9, vig:0.45},
   fade:    {con:0.82, sat:0.85, bri:1.08, tint:['#e8e0d0', 0.12]},
 };
-const lerp = (a, b, k) => a + (b - a) * k;
 function filterCss(){
   const f = FILTERS[S.filter] || {}, k = S.filterAmt; if (!k || S.filter === 'none') return '';
   return ` contrast(${lerp(1, f.con ?? 1, k).toFixed(3)}) saturate(${lerp(1, f.sat ?? 1, k).toFixed(3)}) brightness(${lerp(1, f.bri ?? 1, k).toFixed(3)})`
@@ -1440,8 +1483,12 @@ function refresh(){
   if (c){
     $('ciName').textContent = c.el.isPhoto ? `${c.name} · fotoğraf` : `${c.name} · kaynak ${c.dur.toFixed(2)} sn`;
     $('ciSpeedBox').style.display = c.el.isPhoto ? 'none' : 'block';
-    $('ciSpeedV').textContent = spd(c) + 'x' + (spd(c) !== 1 ? ` · süre ${len(c).toFixed(1)} sn` : '');
-    $('ciSpeed').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.s === spd(c)));
+    const rp = rampOf(c);
+    $('ciSpeedV').textContent = `${+spd(c).toFixed(2)}x${rp !== 'none' ? ' · eğrili' : ''} · süre ${len(c).toFixed(1)} sn (kaynak ${(c.out - c.in).toFixed(1)} sn)`;
+    $('ciSpeed').querySelectorAll('button').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.s - spd(c)) < 1e-6));
+    if (document.activeElement !== $('ciSpeedR')) $('ciSpeedR').value = Math.round(Math.log2(spd(c)) * 100);
+    $('ciRamp').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === rp));
+    if (document.activeElement !== $('ciTarget')) $('ciTarget').placeholder = len(c).toFixed(1);
     $('ciPhoto').style.display = c.el.isPhoto ? 'block' : 'none'; $('ciAudio').style.display = c.el.isPhoto ? 'none' : 'block';
     if (c.el.isPhoto){ setRange('ciPDur', Math.round(len(c)*10), len(c).toFixed(1) + ' sn'); $('ciKB').checked = c.kb !== false; }
     if (document.activeElement !== $('ciIn')) $('ciIn').value = c.in.toFixed(2);
@@ -1452,6 +1499,8 @@ function refresh(){
     if (document.activeElement !== $('ciLabel')) $('ciLabel').value = c.label;
   }
   ['bLeft','bRight','bDup'].forEach(b => $(b).disabled = !c); $('bSplit').disabled = !S.clips.length;
+  $('tlSpeed').disabled = !c || c.el.isPhoto;
+  $('tlSpeed').value = c && !c.el.isPhoto && [0.25,0.5,0.75,1,1.25,1.5,2,3,4].includes(+spd(c)) ? String(+spd(c)) : '';
   const fT = S.focus === 'text' && selTxt();
   $('bDel').disabled = !(fT || (S.focus === 'clip' && c));
   $('bDel').textContent = fT ? (fT.kind === 'img' ? 'Görseli sil' : 'Yazıyı sil') : 'Klibi sil';
@@ -1519,7 +1568,7 @@ function drawTimeline(){
     b.style.left = (off[i]*S.pps) + 'px'; b.style.width = Math.max(4, len(c)*S.pps - 2) + 'px';
     const th = MEDIA[c.mid] && MEDIA[c.mid].thumb;
     if (th) b.style.backgroundImage = `linear-gradient(rgba(23,26,33,.05), rgba(23,26,33,.55)), url(${th})`;
-    const extra = (c.el.isPhoto ? '<span class="bdg">foto</span>' : '') + (spd(c) !== 1 ? `<span class="bdg">${spd(c)}x</span>` : '') + (c.muted ? '<span class="bdg">sessiz</span>' : '');
+    const extra = (c.el.isPhoto ? '<span class="bdg">foto</span>' : '') + (spd(c) !== 1 || rampOf(c) !== 'none' ? `<span class="bdg">${+spd(c).toFixed(2)}x${rampOf(c) !== 'none' ? ' ∿' : ''}</span>` : '') + (c.muted ? '<span class="bdg">sessiz</span>' : '');
     b.innerHTML = `<span></span>${extra}<small>${len(c).toFixed(1)} sn</small>`;
     b.querySelector('span').textContent = (i+1) + '. ' + c.name;
     b.dataset.id = c.id;
@@ -1713,7 +1762,7 @@ $('bSplit').onclick = () => {
   const {i, local} = locate(S.t); const c = S.clips[i]; S.sel = c.id;
   if (local <= 0.1 || local >= len(c) - 0.1){ refresh(); return toast('Klibin ucuna çok yakın'); }
   captureNow();
-  const cut = c.in + local * spd(c);
+  const cut = c.in + mapOf(c).toSrc(local);
   const n = {...c, id: uid++, in: cut, label: ''}; c.out = cut;
   S.clips.splice(i+1, 0, n); S.sel = n.id; S.focus = 'clip'; toast('Klip bölündü'); refresh(); captureNow();
 };
@@ -1748,12 +1797,12 @@ $('ciOut').onchange = e => withSel(c => { setOut(c, +e.target.value); seek(S.t);
 $('ciInHere').onclick = () => withSel((c, i) => {
   const local = S.t - offsets()[i];
   if (local < 0 || local > len(c)) return toast('Oynatma çubuğunu bu klibin üstüne getir');
-  setIn(c, c.in + local * spd(c)); seek(offsets()[i]); toast('Başlangıç kırpıldı');
+  setIn(c, c.in + mapOf(c).toSrc(local)); seek(offsets()[i]); toast('Başlangıç kırpıldı');
 });
 $('ciOutHere').onclick = () => withSel((c, i) => {
   const local = S.t - offsets()[i];
   if (local < 0 || local > len(c)) return toast('Oynatma çubuğunu bu klibin üstüne getir');
-  setOut(c, c.in + local * spd(c)); toast('Bitiş kırpıldı');
+  setOut(c, c.in + mapOf(c).toSrc(local)); toast('Bitiş kırpıldı');
 });
 $('ciVol').oninput = e => { const c = selClip(); if (!c) return; c.vol = e.target.value/100; $('ciVolV').textContent = e.target.value + '%'; if (S.clips[S.cur]?.el === c.el) applyClipGain(c); };
 $('ciMute').onclick = () => withSel(c => { c.muted = !c.muted; if (S.clips[S.cur]?.el === c.el) applyClipGain(c); });
@@ -1767,12 +1816,32 @@ function addText(preset){
 $('txAdd').onclick = () => addText();
 $('txHook').onclick = () => addText({text:'BAŞLIĞI BURAYA YAZ', y:0.12, start:0, end:null, size:110});
 function loadFont(f){ if (document.fonts && document.fonts.load) document.fonts.load(`800 60px "${f}"`).then(draw).catch(()=>{}); }
-$('ciSpeed').onclick = e => { const b = e.target.closest('button'); if (!b) return;
-  withSel(c => { const local = S.t - offsets()[S.clips.indexOf(c)]; const src = c.in + clamp(local, 0, len(c)) * spd(c);
-    c.speed = +b.dataset.s; if (!c.el.paused) c.el.playbackRate = c.speed;
-    // oynatma çubuğu aynı kareye denk gelsin
-    const i = S.clips.indexOf(c); if (S.cur === i) S.t = offsets()[i] + (src - c.in) / spd(c);
-  }); seek(S.t); };
+// Hız/eğri değişince oynatma çubuğu aynı kareye denk gelsin
+function changeSpeed(c, fn){
+  const i = S.clips.indexOf(c), local = S.t - offsets()[i], inside = S.cur === i && local >= 0 && local <= len(c);
+  const src = c.in + mapOf(c).toSrc(clamp(local, 0, len(c)));
+  fn(c);
+  c.speed = clamp(+(c.speed || 1).toFixed(3), 0.1, 5);
+  if (inside) S.t = offsets()[i] + mapOf(c).toLocal(src - c.in);
+}
+function speedSel(fn){
+  const c = selClip(); if (!c) return toast('Önce bir klip seç'); if (c.el.isPhoto) return toast('Fotoğrafın hızı yok; süresini ayarla');
+  withSel(c2 => changeSpeed(c2, fn)); seek(Math.min(S.t, total()));
+}
+$('tlSpeed').onchange = e => { if (e.target.value) speedSel(c => c.speed = +e.target.value); };
+$('ciSpeed').onclick = e => { const b = e.target.closest('button'); if (b) speedSel(c => c.speed = +b.dataset.s); };
+$('ciSpeedR').oninput = e => { const c = selClip(); if (!c || c.el.isPhoto) return;
+  changeSpeed(c, c2 => c2.speed = Math.pow(2, +e.target.value / 100)); seek(Math.min(S.t, total())); refresh(); };
+$('ciSpeedR').onchange = () => captureNow();
+$('ciTargetGo').onclick = () => { const T = +$('ciTarget').value; if (!(T > 0)) return toast('Saniye cinsinden hedef süre yaz');
+  speedSel(c => { c.speed = (c.speed || 1) * len(c) / T; });
+  const c = selClip(); if (c && Math.abs(len(c) - T) > 0.05) toast(`Hız sınırı (0.1x–5x) nedeniyle süre ${len(c).toFixed(1)} sn oldu`);
+  $('ciTarget').value = ''; };
+$('ciTarget').onkeydown = e => { if (e.key === 'Enter') $('ciTargetGo').click(); };
+$('ciRamp').onclick = e => { const b = e.target.closest('button'); if (b) speedSel(c => c.ramp = b.dataset.r); };
+$('ciSpeedAll').onclick = () => { const c = selClip(); if (!c || c.el.isPhoto) return toast('Önce bir video klip seç');
+  captureNow(); let n = 0; for (const o of S.clips) if (!o.el.isPhoto && o !== c){ changeSpeed(o, o2 => { o2.speed = c.speed || 1; o2.ramp = c.ramp || 'none'; }); n++; }
+  seek(Math.min(S.t, total())); refresh(); captureNow(); toast(n ? `${n} klibe uygulandı` : 'Başka video klip yok'); };
 $('ciPDur').oninput = e => withSel(c => { c.out = c.in + e.target.value/10; });
 $('ciKB').onchange = e => withSel(c => { c.kb = e.target.checked; });
 const tx = fn => e => { const x = selTxt(); if (!x) return; fn(x, e); refresh(); };
@@ -2421,7 +2490,7 @@ function snapshot(){
   const o = {v:1};
   for (const k of LOOK) o[k] = S[k];
   o.duck = {...S.duck};
-  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1}; });
+  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1, ramp:c.ramp || 'none'}; });
   o.texts = S.texts.map(({_bb, ...x}) => x);
   o.music = S.music ? {aid:S.music.aid, name:S.music.name, vol:S.music.vol, start:S.music.start, loop:S.music.loop, fadeIn:S.music.fadeIn, fadeOut:S.music.fadeOut, duck:S.music.duck} : null;
   o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
