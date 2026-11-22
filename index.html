@@ -214,8 +214,9 @@ label.chk input{width:16px;flex:0 0 auto}
           <button data-tr="slide"><b>Kaydırma</b><small>Yeni klip sağdan gelir</small></button>
           <button data-tr="zoom"><b>Yakınlaşma</b><small>Hızlı zoom ile geçer</small></button>
         </div>
-        <div id="transDurBox"><label>Geçiş süresi <span id="transDurV">0.5 sn</span></label>
-        <input type="range" id="transDur" min="2" max="15" value="5"></div>
+        <div id="transDurBox"><label>Geçiş süresi <span id="transDurV">1.0 sn</span></label>
+        <input type="range" id="transDur" min="2" max="30" value="10">
+        <p class="hint">Kısa kliplerde geçiş, klibin yarısını geçmeyecek şekilde otomatik kısalır.</p></div>
       </div>
       <div class="card" id="clipInsp" style="margin-top:10px;display:none">
         <h3>Seçili klip</h3>
@@ -575,7 +576,7 @@ const FORMATS = {'9:16':[1080,1920],'4:5':[1080,1350],'1:1':[1080,1080],'16:9':[
 
 const S = {
   clips: [], texts: [], vo: null,
-  transType:'none', transDur:0.5, music:null,
+  transType:'none', transDur:1, music:null,
   fmt:'9:16', fit:'blur', blurAmt:0.6, bgDim:0.2, safe:'', bg:'#000000', zoom:1, bright:100, contrast:100, sat:100, master:1, voVol:1,
   duck:{on:true, lvl:0.25},
   rank:{on:false, dir:'down', pos:'tl', color:'#2ee6a6', text:'#04140e'},
@@ -861,8 +862,10 @@ const prevCv = document.createElement('canvas'), prevCtx = prevCv.getContext('2d
 const tmpCv = document.createElement('canvas'), tmpCtx = tmpCv.getContext('2d');
 const ease = p => p < .5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2)/2;
 function drawTransition(W, H){
-  const n = S.clips.length, i = S.cur, type = S.transType, d = S.transDur;
+  const n = S.clips.length, i = S.cur, type = S.transType;
   const local = S.t - offsets()[i], L = len(S.clips[i]);
+  // geçiş, bu klibin ve önceki klibin yarısını geçmesin
+  const d = Math.max(0.1, Math.min(S.transDur, L/2, i > 0 ? len(S.clips[i-1])/2 : Infinity));
   const incoming = type !== 'none' && i > 0 && local < d;
   // gelen geçiş bölgesi dışında, bu klibin karesini sakla
   if (!incoming){
