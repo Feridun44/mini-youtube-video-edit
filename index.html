@@ -85,6 +85,8 @@ footer{border-top:1px solid var(--line);background:var(--panel)}
 .opts button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:1px;padding:7px 9px}
 .opts button b{font-size:12px}
 .opts button small{font-size:10.5px;color:var(--muted);line-height:1.25}
+.opts3{grid-template-columns:1fr 1fr 1fr}
+.opts3 button{padding:6px 7px}
 .opts button.on small{color:inherit;opacity:.85}
 label.chk{display:flex;gap:7px;align-items:center;color:var(--text);margin:5px 0}
 label.chk input{width:auto;flex:0 0 auto}
@@ -286,7 +288,36 @@ label.chk input{width:auto;flex:0 0 auto}
         </div>
         <label>Dikey konum <span id="txYV"></span></label>
         <input type="range" id="txY" min="3" max="97">
-        <label class="row" style="color:var(--text)"><input type="checkbox" id="txBox" style="flex:0 0 auto;width:auto"> Arkasına koyu kutu</label>
+        <label>Yazı arka planı</label>
+        <div class="opts opts3" id="txBgBtns">
+          <button data-bg="none" class="on"><b>Yok</b><small>Sadece yazı</small></button>
+          <button data-bg="box"><b>Kutu</b><small>Tüm yazı tek kutu</small></button>
+          <button data-bg="line"><b>Satır</b><small>Her satıra şerit</small></button>
+          <button data-bg="pill"><b>Hap</b><small>Yuvarlak satırlar</small></button>
+          <button data-bg="word"><b>Kelime</b><small>Her kelimeye kutu</small></button>
+          <button data-bg="band"><b>Bant</b><small>Tam genişlik şerit</small></button>
+          <button data-bg="glow"><b>Parıltı</b><small>Yumuşak gölge</small></button>
+          <button data-bg="frame"><b>Çerçeve</b><small>Sadece kenar çizgisi</small></button>
+          <button data-bg="tilt"><b>Eğik</b><small>Hafif döndürülmüş kutu</small></button>
+        </div>
+        <div id="txBgOpts" style="display:none">
+          <div class="row" style="align-items:flex-end">
+            <div style="flex:0 0 auto"><label>Renk</label><input type="color" id="txBgColor"></div>
+            <div><label>Saydamlık <span id="txBgOpV"></span></label><input type="range" id="txBgOp" min="10" max="100"></div>
+          </div>
+          <div class="row">
+            <div><label>İç boşluk <span id="txBgPadV"></span></label><input type="range" id="txBgPad" min="5" max="80"></div>
+            <div><label>Köşe <span id="txBgRadV"></span></label><input type="range" id="txBgRad" min="0" max="100"></div>
+          </div>
+          <div class="row" id="txBgPresets" style="flex-wrap:wrap;margin-top:6px">
+            <button data-c="#000000" data-o="60" data-t="#ffffff" title="Siyah kutu, beyaz yazı">Siyah</button>
+            <button data-c="#ffffff" data-o="100" data-t="#111111" title="Beyaz kutu, siyah yazı">Beyaz</button>
+            <button data-c="#ffd400" data-o="100" data-t="#111111" title="Sarı kutu, siyah yazı">Sarı</button>
+            <button data-c="#e5322d" data-o="100" data-t="#ffffff" title="Kırmızı kutu, beyaz yazı">Kırmızı</button>
+            <button data-c="#7c3aed" data-o="100" data-t="#ffffff" title="Mor kutu, beyaz yazı">Mor</button>
+          </div>
+          <p class="hint">Hazır renkler yazı rengini de uyumlu yapar.</p>
+        </div>
         <div class="row">
           <div><label>Başlangıç (sn)</label><input type="number" id="txStart" step="0.1" min="0"></div>
           <div><label>Bitiş (sn, boş=sona kadar)</label><input type="number" id="txEnd" step="0.1" min="0"></div>
@@ -757,10 +788,8 @@ function drawText(x, W, H){
   const CX = W * (x.x == null ? 0.5 : x.x);
   const mw = Math.max(0, ...lines.map(l => l.w)), pad = x.size*0.3;
   x._bb = {x: CX - mw/2 - pad, y: y0 - lh/2 - pad*0.5, w: mw + pad*2, h: lh*lines.length + pad};
-  if (x.box){
-    ctx.fillStyle = 'rgba(0,0,0,.6)';
-    ctx.fillRect(x._bb.x, x._bb.y, x._bb.w, x._bb.h);
-  }
+  const bg = x.bg || (x.box ? 'box' : 'none');
+  if (bg !== 'none' && bg !== 'glow') drawTextBg(x, bg, lines, sp, y0, lh, CX, W);
   ctx.lineJoin = 'round'; ctx.miterLimit = 2;
   // önce tüm kenarlıklar, sonra dolgu: harfler birbirinin kenarlığını örtmesin
   if (!S.exporting && !S.fullRes && x.id === S.selText){
@@ -775,12 +804,60 @@ function drawText(x, W, H){
         if (wi) cx += sp;
         for (const p of w){
           if (pass === 'stroke'){ ctx.lineWidth = x.strokeW*2; ctx.strokeStyle = x.stroke; ctx.strokeText(p.t, cx, y); }
-          else { ctx.fillStyle = p.col || x.color; ctx.fillText(p.t, cx, y); }
+          else {
+            ctx.fillStyle = p.col || x.color;
+            if (bg === 'glow'){ ctx.shadowColor = rgba(x.bgColor || '#000000', x.bgOp ?? 0.6); ctx.shadowBlur = x.size*(0.2 + (x.bgPad ?? 0.3)); }
+            ctx.fillText(p.t, cx, y); ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+          }
           cx += ctx.measureText(p.t).width;
         }
       });
     });
   }
+}
+
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; };
+function rrect(x0, y0, w, h, r){
+  r = Math.max(0, Math.min(r, w/2, h/2));
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x0, y0, w, h, r);
+  else { ctx.moveTo(x0+r, y0); ctx.arcTo(x0+w, y0, x0+w, y0+h, r); ctx.arcTo(x0+w, y0+h, x0, y0+h, r); ctx.arcTo(x0, y0+h, x0, y0, r); ctx.arcTo(x0, y0, x0+w, y0, r); ctx.closePath(); }
+}
+// Yazı arka planı: kutu, satır, hap, kelime, bant, çerçeve, eğik
+function drawTextBg(x, bg, lines, sp, y0, lh, CX, W){
+  const fs = x.size, pad = fs * (x.bgPad ?? 0.3), rad = fs * 0.6 * (x.bgRad ?? 0.25);
+  const col = rgba(x.bgColor || '#000000', x.bgOp ?? 0.6);
+  const lineH = fs * 1.02 + pad*0.7; // tek satır kutusu yüksekliği
+  const mw = Math.max(0, ...lines.map(l => l.w));
+  const top = y0 - lh/2 - pad*0.5, H = lh*lines.length + pad;
+  ctx.save(); ctx.fillStyle = col; ctx.strokeStyle = col;
+  if (bg === 'box' || bg === 'tilt'){
+    if (bg === 'tilt'){ ctx.translate(CX, top + H/2); ctx.rotate(-0.035); ctx.translate(-CX, -(top + H/2)); }
+    rrect(CX - mw/2 - pad, top, mw + pad*2, H, rad); ctx.fill();
+  } else if (bg === 'line' || bg === 'pill'){
+    lines.forEach((l, k) => {
+      if (!l.words.length) return;
+      const y = y0 + k*lh, w = l.w + pad*2;
+      rrect(CX - w/2, y - lineH/2, w, lineH, bg === 'pill' ? lineH/2 : rad*0.6); ctx.fill();
+    });
+  } else if (bg === 'word'){
+    const wp = pad*0.45;
+    lines.forEach((l, k) => {
+      const y = y0 + k*lh; let cx = CX - l.w/2;
+      l.words.forEach((w, wi) => {
+        if (wi) cx += sp;
+        const ww = w.reduce((a, p) => a + ctx.measureText(p.t).width, 0);
+        rrect(cx - wp, y - lineH/2, ww + wp*2, lineH, rad*0.6); ctx.fill();
+        cx += ww;
+      });
+    });
+  } else if (bg === 'band'){
+    ctx.fillRect(0, top, W, H);
+  } else if (bg === 'frame'){
+    ctx.lineWidth = Math.max(2, fs*0.07);
+    rrect(CX - mw/2 - pad, top, mw + pad*2, H, rad); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // ---------- arayüz yenileme ----------
@@ -843,7 +920,13 @@ function refresh(){
     $('txFont').value = x.font; $('txSize').value = x.size; $('txSizeV').textContent = x.size + 'px';
     $('txColor').value = x.color; $('txHl').value = x.hl || '#ffd400'; $('txStroke').value = x.stroke; $('txStrokeW').value = x.strokeW;
     $('txY').value = Math.round(x.y*100); $('txYV').textContent = Math.round(x.y*100) + '%';
-    $('txBox').checked = x.box;
+    const bgm = x.bg || (x.box ? 'box' : 'none');
+    $('txBgBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.bg === bgm));
+    $('txBgOpts').style.display = bgm === 'none' ? 'none' : 'block';
+    $('txBgColor').value = x.bgColor || '#000000';
+    $('txBgOp').value = Math.round((x.bgOp ?? 0.6)*100); $('txBgOpV').textContent = $('txBgOp').value + '%';
+    $('txBgPad').value = Math.round((x.bgPad ?? 0.3)*100); $('txBgPadV').textContent = $('txBgPad').value + '%';
+    $('txBgRad').value = Math.round((x.bgRad ?? 0.25)*100); $('txBgRadV').textContent = $('txBgRad').value + '%';
     if (document.activeElement !== $('txStart')) $('txStart').value = x.start.toFixed(2);
     if (document.activeElement !== $('txEnd')) $('txEnd').value = x.end == null ? '' : x.end.toFixed(2);
   }
@@ -973,7 +1056,7 @@ $('ciLabel').oninput = e => { const c = selClip(); if (c){ c.label = e.target.va
 
 // ---------- yazılar ----------
 function addText(preset){
-  const x = Object.assign({id: uid++, text:'YAZINI BURAYA YAZ', font:'Impact', size:96, color:'#ffffff', hl:'#ffd400', stroke:'#000000', strokeW:8, y:0.5, box:false, start: S.t, end: Math.min(S.t + 3, Math.max(total(), S.t + 3))}, preset||{});
+  const x = Object.assign({id: uid++, text:'YAZINI BURAYA YAZ', font:'Impact', size:96, color:'#ffffff', hl:'#ffd400', stroke:'#000000', strokeW:8, y:0.5, bg:'none', bgColor:'#000000', bgOp:0.6, bgPad:0.3, bgRad:0.25, start: S.t, end: Math.min(S.t + 3, Math.max(total(), S.t + 3))}, preset||{});
   S.texts.push(x); S.selText = x.id; switchTab('R','pText'); loadFont(x.font); refresh();
 }
 $('txAdd').onclick = () => addText();
@@ -1009,7 +1092,15 @@ $('txHlClear').onclick = () => { const x = selTxt(); if (!x) return; x.text = st
 $('txStroke').oninput = tx((x,e) => x.stroke = e.target.value);
 $('txStrokeW').oninput = tx((x,e) => x.strokeW = clamp(+e.target.value||0, 0, 30));
 $('txY').oninput = tx((x,e) => x.y = e.target.value/100);
-$('txBox').onchange = tx((x,e) => x.box = e.target.checked);
+$('txBgBtns').onclick = tx((x,e) => { const b = e.target.closest('button'); if (!b) return; x.bg = b.dataset.bg; delete x.box;
+  // koyu kutuda kenarlık gereksiz kalabalık yapar; kutulu tarzlarda kenarlığı incelt
+  if (['box','line','pill','word','band','tilt'].includes(x.bg) && x.strokeW > 4) x.strokeW = 0; });
+$('txBgColor').oninput = tx((x,e) => x.bgColor = e.target.value);
+$('txBgOp').oninput = tx((x,e) => x.bgOp = e.target.value/100);
+$('txBgPad').oninput = tx((x,e) => x.bgPad = e.target.value/100);
+$('txBgRad').oninput = tx((x,e) => x.bgRad = e.target.value/100);
+$('txBgPresets').onclick = tx((x,e) => { const b = e.target.closest('button'); if (!b) return;
+  x.bgColor = b.dataset.c; x.bgOp = +b.dataset.o/100; x.color = b.dataset.t; if (x.bg === 'none' || !x.bg) x.bg = 'line'; });
 $('txPosBtns').onclick = tx((x,e) => { const b = e.target.closest('button'); if (b){ x.y = +b.dataset.pos; x.x = 0.5; } });
 $('txStart').onchange = tx((x,e) => x.start = Math.max(0, +e.target.value||0));
 $('txEnd').onchange = tx((x,e) => x.end = e.target.value === '' ? null : Math.max(x.start + 0.1, +e.target.value));
