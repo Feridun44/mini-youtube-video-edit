@@ -201,8 +201,8 @@ label.chk input{width:16px;flex:0 0 auto}
     </div>
     <div class="pane active" id="pMedia">
       <h3>Video yükle</h3>
-      <div id="drop">Videoları buraya sürükle ya da <b>tıkla ve seç</b><br><small>Birden fazla video ekleyebilirsin; sırayla birleşir.</small></div>
-      <input type="file" id="fileVideo" accept="video/*" multiple hidden>
+      <div id="drop">Video ve fotoğrafları buraya sürükle ya da <b>tıkla ve seç</b><br><small>Birden fazla dosya ekleyebilirsin; sırayla birleşir.</small></div>
+      <input type="file" id="fileVideo" accept="video/*,image/*" multiple hidden>
       <div class="list" id="clipList"></div>
       <div id="transBox" style="margin-top:14px">
         <h3>Klipler arası geçiş</h3>
@@ -228,8 +228,15 @@ label.chk input{width:16px;flex:0 0 auto}
           <button id="ciInHere" title="Klibin başını oynatma çubuğuna çek">Başı buraya</button>
           <button id="ciOutHere" title="Klibin sonunu oynatma çubuğuna çek">Sonu buraya</button>
         </div>
+        <div id="ciPhoto" style="display:none">
+          <label>Fotoğraf süresi <span id="ciPDurV">3.0 sn</span></label>
+          <input type="range" id="ciPDur" min="5" max="150" value="30">
+          <label class="chk"><input type="checkbox" id="ciKB" checked> Yavaş yakınlaşma (Ken Burns)</label>
+        </div>
+        <div id="ciAudio">
         <label>Klip sesi <span id="ciVolV">100%</span></label>
         <div class="row"><input type="range" id="ciVol" min="0" max="200" value="100"><button class="auto" id="ciMute">Sessiz</button></div>
+        </div>
         <div hidden><label>Sıralama etiketi</label>
         <input type="text" id="ciLabel" placeholder="ör. En hızlı araba"></div>
       </div>
@@ -358,6 +365,25 @@ label.chk input{width:16px;flex:0 0 auto}
     </div>
     <div class="pane active" id="pText">
       <div class="row"><button id="txAdd" class="primary">+ Yazı ekle</button><button id="txHook">Hızlı başlık</button></div>
+      <button id="imAdd" style="width:100%;margin-top:6px" title="Logo, çıkartma ya da fotoğrafı videonun üstüne koy">🖼 Görsel ekle (logo, çıkartma)</button>
+      <input type="file" id="fileImg" accept="image/*" hidden>
+      <div class="card" id="imInsp" style="margin-top:10px;display:none">
+        <h3>Görsel</h3>
+        <div class="hint" id="imName"></div>
+        <p class="hint">Önizlemede sürükleyerek taşı.</p>
+        <label>Boyut <span id="imWV"></span></label><input type="range" id="imW" min="5" max="100">
+        <label>Saydamlık <span id="imOpV"></span></label><input type="range" id="imOp" min="10" max="100">
+        <label>Köşe yuvarlaklığı <span id="imRadV"></span></label><input type="range" id="imRad" min="0" max="100">
+        <label class="chk"><input type="checkbox" id="imShadow"> Gölge</label>
+        <label>Giriş / çıkış</label>
+        <div class="row" id="imAnimIn"><button data-a="none">Yok</button><button data-a="fade">Belirme</button><button data-a="pop">Büyüme</button><button data-a="slide">Kayma</button></div>
+        <div class="row" id="imAnimOut" style="margin-top:6px"><button data-a="none">Çıkış yok</button><button data-a="fade">Solma</button><button data-a="shrink">Küçülme</button></div>
+        <div class="row">
+          <div><label>Başlangıç (sn)</label><input type="number" id="imStart" step="0.1" min="0"></div>
+          <div><label>Bitiş (sn, boş=sona kadar)</label><input type="number" id="imEnd" step="0.1" min="0"></div>
+        </div>
+        <button id="imDel" class="danger" style="margin-top:8px;width:100%">Görseli sil</button>
+      </div>
       <div class="list" id="textList"></div>
       <div class="card" id="txInsp" style="margin-top:10px;display:none">
         <label>Metin</label>
@@ -503,7 +529,7 @@ label.chk input{width:16px;flex:0 0 auto}
 <footer>
   <div id="tlbar">
     <b style="margin-right:6px">Zaman çizelgesi</b>
-    <button id="bAdd" class="primary" title="Sona yeni video ekle">+ Video ekle</button>
+    <button id="bAdd" class="primary" title="Sona video ya da fotoğraf ekle">+ Video / foto ekle</button>
     <button id="bSplit" title="Oynatma çubuğundan böl (S)">✂ Böl</button>
     <button id="bLeft" title="Seçili klibi sola taşı">← Sola</button>
     <button id="bRight" title="Seçili klibi sağa taşı">Sağa →</button>
@@ -587,7 +613,7 @@ function ensureAudio(){
   if (AC.state === 'suspended') AC.resume();
 }
 function wireEl(el){
-  if (!AC || el._src) return;
+  if (!AC || el._src || el.isPhoto) return;
   el._src = AC.createMediaElementSource(el);
   el._gain = AC.createGain(); el._src.connect(el._gain); el._gain.connect(masterGain);
 }
@@ -609,7 +635,28 @@ function loadMeta(el){
 }
 // Yüklenen her dosya bir kez "medya" olarak tutulur; klipler (bölünmüş parçalar dahil) ona mid ile bağlanır.
 const MEDIA = {}, CLIPS = {}, VOS = {};
+// Fotoğraf klibi: <video> gibi davranan küçük bir nesne (zaman, oynat/duraklat, olaylar)
+class PhotoEl {
+  constructor(img){ this.img = img; this.isPhoto = true; this.videoWidth = img.naturalWidth; this.videoHeight = img.naturalHeight;
+    this.readyState = 4; this.ended = false; this._t = 0; this._p = true; this._t0 = 0; this._ev = {}; }
+  get currentTime(){ return this._p ? this._t : this._t + (performance.now() - this._t0)/1000; }
+  set currentTime(v){ this._t = v; this._t0 = performance.now(); setTimeout(() => this._fire('seeked'), 0); }
+  get paused(){ return this._p; }
+  play(){ if (this._p){ this._t0 = performance.now(); this._p = false; } setTimeout(() => this._fire('playing'), 0); return Promise.resolve(); }
+  pause(){ if (!this._p){ this._t = this.currentTime; this._p = true; } }
+  addEventListener(n, f, o){ (this._ev[n] = this._ev[n] || []).push({f, once: o && o.once}); }
+  removeEventListener(n, f){ this._ev[n] = (this._ev[n] || []).filter(h => h.f !== f); }
+  _fire(n){ const hs = this._ev[n] || []; this._ev[n] = hs.filter(h => !h.once); hs.forEach(h => h.f()); }
+  remove(){}
+}
 async function loadMedia(blob, name, mid){
+  if ((blob.type || '').startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|avif)$/i.test(name)){
+    const img = new Image(); img.src = URL.createObjectURL(blob); await img.decode();
+    const el = new PhotoEl(img); el.addEventListener('seeked', draw);
+    mid = mid || uid++;
+    MEDIA[mid] = {mid, el, dur: 600, name, photo: true};
+    return MEDIA[mid];
+  }
   const el = document.createElement('video');
   el.src = URL.createObjectURL(blob); el.preload = 'auto'; el.playsInline = true; el.crossOrigin = 'anonymous';
   $('hiddenMedia').appendChild(el);
@@ -626,15 +673,15 @@ async function loadMedia(blob, name, mid){
 async function addVideoFiles(files){
   let n = 0;
   for (const f of files){
-    if (!f.type.startsWith('video/') && !/\.(mp4|mov|webm|m4v|mkv)$/i.test(f.name)) { toast(f.name + ' video değil'); continue; }
+    if (!f.type.startsWith('video/') && !f.type.startsWith('image/') && !/\.(mp4|mov|webm|m4v|mkv|jpe?g|png|webp|gif)$/i.test(f.name)) { toast(f.name + ' video ya da fotoğraf değil'); continue; }
     try {
       const m = await loadMedia(f, f.name);
       store.put('m:' + m.mid, f);
-      const c = {id: uid++, mid: m.mid, name: f.name, el: m.el, dur: m.dur, in: 0, out: m.dur, vol: 1, muted: false, label: ''};
+      const c = {id: uid++, mid: m.mid, name: f.name, el: m.el, dur: m.dur, in: 0, out: m.photo ? 3 : m.dur, vol: 1, muted: false, label: '', kb: true};
       CLIPS[c.id] = c; S.clips.push(c); S.sel = c.id; n++;
     } catch(e){ toast(f.name + ': ' + e.message); }
   }
-  if (n){ toast(n + ' klip eklendi'); seek(S.t); }
+  if (n){ toast(n + ' öğe eklendi'); seek(S.t); }
   refresh();
 }
 $('drop').onclick = () => $('fileVideo').click();
@@ -803,7 +850,7 @@ function draw(){
   if (S.rank.on && c) drawRank(c, W, H);
   for (const x of S.texts){
     const end = x.end == null ? Infinity : x.end;
-    if (S.t >= x.start && (S.t < end || (end === Infinity))) drawText(x, W, H);
+    if (S.t >= x.start && (S.t < end || (end === Infinity))) (x.kind === 'img' ? drawImgLayer : drawText)(x, W, H);
   }
   if (S.safe && !S.exporting && !S.fullRes) drawSafe(W, H);
   $('empty').style.display = S.clips.length ? 'none' : 'flex';
@@ -857,31 +904,36 @@ function videoRect(c, W, H){
 const bgCv = document.createElement('canvas'), bgCtx = bgCv.getContext('2d');
 function drawVideo(c, W, H){
   const look = `brightness(${S.bright}%) contrast(${S.contrast}%) saturate(${S.sat}%)`;
-  const r = videoRect(c, W, H), gaps = r.x > 0.5 || r.y > 0.5 || r.x + r.w < W - 0.5 || r.y + r.h < H - 0.5;
+  let r = videoRect(c, W, H); const gaps = r.x > 0.5 || r.y > 0.5 || r.x + r.w < W - 0.5 || r.y + r.h < H - 0.5;
+  const src = c.el.img || c.el;
+  if (c.el.isPhoto && c.kb !== false){ // yavaş yakınlaşma: klip boyunca %0 → %10
+    const z = 1 + 0.1 * clamp((c.el.currentTime - c.in) / Math.max(0.1, len(c)), 0, 1);
+    r = {...r, x: r.x - r.w*(z-1)/2, y: r.y - r.h*(z-1)/2, w: r.w*z, h: r.h*z};
+  }
   if (gaps && S.fit === 'blur'){
     // küçük tuvale çiz, büyüt: ucuz ve yumuşak bulanıklık (gerçek zamanlı dışa aktarmada da akıcı)
     const div = 6 + Math.round(S.blurAmt * 26), bw = Math.max(8, Math.round(W/div)), bh = Math.max(8, Math.round(H/div));
     if (bgCv.width !== bw || bgCv.height !== bh){ bgCv.width = bw; bgCv.height = bh; }
     const vw = c.el.videoWidth, vh = c.el.videoHeight, cs = Math.max(bw/vw, bh/vh) * 1.1;
     bgCtx.filter = `blur(${(1 + S.blurAmt*2).toFixed(1)}px) ${look} brightness(${Math.round(100 - S.bgDim*100)}%)`;
-    bgCtx.drawImage(c.el, (bw - vw*cs)/2, (bh - vh*cs)/2, vw*cs, vh*cs);
+    bgCtx.drawImage(src, (bw - vw*cs)/2, (bh - vh*cs)/2, vw*cs, vh*cs);
     bgCtx.filter = 'none';
     ctx.drawImage(bgCv, 0, 0, W, H);
   }
   if (gaps && S.fit === 'mirror'){
     ctx.save(); ctx.filter = look + ' brightness(80%)';
     if (r.y > 0.5){ // üst/alt boşluk: dikey ayna
-      ctx.save(); ctx.translate(0, r.y); ctx.scale(1, -1); ctx.drawImage(c.el, r.x, 0, r.w, r.h); ctx.restore();
-      ctx.save(); ctx.translate(0, r.y + r.h*2); ctx.scale(1, -1); ctx.drawImage(c.el, r.x, 0, r.w, r.h); ctx.restore();
+      ctx.save(); ctx.translate(0, r.y); ctx.scale(1, -1); ctx.drawImage(src, r.x, 0, r.w, r.h); ctx.restore();
+      ctx.save(); ctx.translate(0, r.y + r.h*2); ctx.scale(1, -1); ctx.drawImage(src, r.x, 0, r.w, r.h); ctx.restore();
     }
     if (r.x > 0.5){ // yan boşluk: yatay ayna
-      ctx.save(); ctx.translate(r.x, 0); ctx.scale(-1, 1); ctx.drawImage(c.el, 0, r.y, r.w, r.h); ctx.restore();
-      ctx.save(); ctx.translate(r.x + r.w*2, 0); ctx.scale(-1, 1); ctx.drawImage(c.el, 0, r.y, r.w, r.h); ctx.restore();
+      ctx.save(); ctx.translate(r.x, 0); ctx.scale(-1, 1); ctx.drawImage(src, 0, r.y, r.w, r.h); ctx.restore();
+      ctx.save(); ctx.translate(r.x + r.w*2, 0); ctx.scale(-1, 1); ctx.drawImage(src, 0, r.y, r.w, r.h); ctx.restore();
     }
     ctx.restore();
   }
   ctx.filter = look;
-  ctx.drawImage(c.el, r.x, r.y, r.w, r.h);
+  ctx.drawImage(src, r.x, r.y, r.w, r.h);
   ctx.filter = 'none';
   if (gaps && (S.fit === 'blur' || S.fit === 'mirror')){
     // video kenarına ince gölge: arka plandan ayrışsın
@@ -1016,6 +1068,28 @@ function drawText(x, W, H){
   }
   ctx.restore();
 }
+const IMGS = {};
+function drawImgLayer(x, W, H){
+  const img = IMGS[x.imgId]; if (!img) return;
+  const w = W * x.w, h = w * img.naturalHeight / img.naturalWidth, cx = W * (x.x ?? 0.5), cy = H * x.y;
+  x._bb = {x: cx - w/2, y: cy - h/2, w, h};
+  const A = textAnim(x, []); if (A.a <= 0.001) return;
+  ctx.save();
+  ctx.translate(cx, cy + A.dy); ctx.scale(A.s, A.s); ctx.translate(-cx, -cy);
+  ctx.globalAlpha = A.a * (x.op ?? 1);
+  const rad = (x.rad || 0) * Math.min(w, h) / 2;
+  if (x.shadow){ ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = W*0.025; ctx.shadowOffsetY = W*0.006; ctx.fillStyle = 'rgba(0,0,0,.01)'; rrect(x._bb.x, x._bb.y, w, h, rad); ctx.fill(); ctx.restore(); }
+  rrect(x._bb.x, x._bb.y, w, h, rad); ctx.clip();
+  ctx.drawImage(img, x._bb.x, x._bb.y, w, h);
+  ctx.restore();
+  if (!S.exporting && !S.fullRes && x.id === S.selText){
+    ctx.save(); ctx.setLineDash([W*0.012, W*0.008]); ctx.lineWidth = W*0.003; ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    ctx.strokeRect(x._bb.x, x._bb.y, w, h); ctx.restore();
+  }
+}
+async function loadImgBlob(blob, id){
+  const img = new Image(); img.src = URL.createObjectURL(blob); await img.decode(); IMGS[id] = img; return img;
+}
 const easeOut = p => 1 - Math.pow(1 - p, 3);
 const backOut = p => 1 + 2.70158*Math.pow(p - 1, 3) + 1.70158*Math.pow(p - 1, 2);
 // Yazı animasyon durumu: saydamlık, ölçek, dikey kayma, daktilo harf sayısı, kelime kelime ilerleme
@@ -1120,7 +1194,9 @@ function refresh(){
   const c = selClip();
   $('clipInsp').style.display = c ? 'block' : 'none';
   if (c){
-    $('ciName').textContent = `${c.name} · kaynak ${c.dur.toFixed(2)} sn`;
+    $('ciName').textContent = c.el.isPhoto ? `${c.name} · fotoğraf` : `${c.name} · kaynak ${c.dur.toFixed(2)} sn`;
+    $('ciPhoto').style.display = c.el.isPhoto ? 'block' : 'none'; $('ciAudio').style.display = c.el.isPhoto ? 'none' : 'block';
+    if (c.el.isPhoto){ setRange('ciPDur', Math.round(len(c)*10), len(c).toFixed(1) + ' sn'); $('ciKB').checked = c.kb !== false; }
     if (document.activeElement !== $('ciIn')) $('ciIn').value = c.in.toFixed(2);
     if (document.activeElement !== $('ciOut')) $('ciOut').value = c.out.toFixed(2);
     $('ciIn').max = $('ciOut').max = c.dur.toFixed(2);
@@ -1134,13 +1210,25 @@ function refresh(){
   S.texts.forEach(x => {
     const d = document.createElement('div'); d.className = 'item' + (x.id === S.selText ? ' sel' : '');
     d.innerHTML = `<span class="nm"></span><span class="mono">${x.start.toFixed(1)}–${x.end==null?'son':x.end.toFixed(1)}</span>`;
-    d.querySelector('.nm').textContent = stripMarks(x.text.replace(/\n/g,' ')) || '(boş)';
+    d.querySelector('.nm').textContent = x.kind === 'img' ? '🖼 ' + x.name : (stripMarks(x.text.replace(/\n/g,' ')) || '(boş)');
     d.onclick = () => { S.selText = x.id; refresh(); };
     $('textList').appendChild(d);
   });
-  const x = selTxt();
-  $('txInsp').style.display = x ? 'block' : 'none';
-  if (x){
+  const x = selTxt(), isImg = x && x.kind === 'img';
+  $('txInsp').style.display = x && !isImg ? 'block' : 'none';
+  $('imInsp').style.display = isImg ? 'block' : 'none';
+  if (isImg){
+    $('imName').textContent = x.name;
+    setRange('imW', Math.round(x.w*100), Math.round(x.w*100) + '%');
+    setRange('imOp', Math.round((x.op ?? 1)*100), Math.round((x.op ?? 1)*100) + '%');
+    setRange('imRad', Math.round((x.rad || 0)*100), Math.round((x.rad || 0)*100) + '%');
+    $('imShadow').checked = !!x.shadow;
+    $('imAnimIn').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.a === (x.animIn || 'none')));
+    $('imAnimOut').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.a === (x.animOut || 'none')));
+    if (document.activeElement !== $('imStart')) $('imStart').value = x.start.toFixed(2);
+    if (document.activeElement !== $('imEnd')) $('imEnd').value = x.end == null ? '' : x.end.toFixed(2);
+  }
+  if (x && !isImg){
     if (document.activeElement !== $('txText')) $('txText').value = x.text;
     $('txFont').value = x.font; $('txSize').value = x.size; $('txSizeV').textContent = x.size + 'px';
     $('txColor').value = x.color; $('txHl').value = x.hl || '#ffd400'; $('txStroke').value = x.stroke; $('txStrokeW').value = x.strokeW;
@@ -1189,7 +1277,7 @@ function drawTimeline(){
     const b = document.createElement('div'); b.className = 'blk t' + (x.id === S.selText ? ' sel' : '');
     const e = x.end == null ? total() : x.end;
     b.style.left = (x.start*S.pps) + 'px'; b.style.width = Math.max(6, (e - x.start)*S.pps - 2) + 'px';
-    b.textContent = stripMarks(x.text.replace(/\n/g,' ')); b.dataset.tid = x.id;
+    b.textContent = x.kind === 'img' ? '🖼 ' + x.name : stripMarks(x.text.replace(/\n/g,' ')); b.dataset.tid = x.id;
     $('trTexts').appendChild(b);
   });
   // müzik şeridi
@@ -1324,7 +1412,30 @@ function addText(preset){
 $('txAdd').onclick = () => addText();
 $('txHook').onclick = () => addText({text:'BAŞLIĞI BURAYA YAZ', y:0.12, start:0, end:null, size:110});
 function loadFont(f){ if (document.fonts && document.fonts.load) document.fonts.load(`800 60px "${f}"`).then(draw).catch(()=>{}); }
+$('ciPDur').oninput = e => withSel(c => { c.out = c.in + e.target.value/10; });
+$('ciKB').onchange = e => withSel(c => { c.kb = e.target.checked; });
 const tx = fn => e => { const x = selTxt(); if (!x) return; fn(x, e); refresh(); };
+$('imAdd').onclick = () => $('fileImg').click();
+$('fileImg').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const imgId = uid++; const img = await loadImgBlob(f, imgId); store.put('i:' + imgId, f);
+    const w = img.naturalWidth >= img.naturalHeight ? 0.5 : 0.35;
+    const x = {id: uid++, kind:'img', imgId, name: f.name, w, op: 1, rad: 0, shadow: false, x: 0.5, y: 0.5, animIn:'pop', animOut:'none', animDur:0.4,
+      start: S.t, end: null};
+    S.texts.push(x); S.selText = x.id; switchTab('R','pText'); refresh(); toast('Görsel eklendi');
+  } catch(err){ toast('Görsel okunamadı'); }
+};
+const im = (id, fn) => $(id).addEventListener('input', tx((x,e) => { if (x.kind === 'img') fn(x, e.target); }));
+im('imW', (x, t) => x.w = t.value/100);
+im('imOp', (x, t) => x.op = t.value/100);
+im('imRad', (x, t) => x.rad = t.value/100);
+$('imShadow').onchange = tx((x,e) => x.shadow = e.target.checked);
+$('imAnimIn').onclick = tx((x,e) => { const b = e.target.closest('button'); if (b){ x.animIn = b.dataset.a; previewText(x); } });
+$('imAnimOut').onclick = tx((x,e) => { const b = e.target.closest('button'); if (b) x.animOut = b.dataset.a; });
+$('imStart').onchange = tx((x,e) => x.start = Math.max(0, +e.target.value||0));
+$('imEnd').onchange = tx((x,e) => x.end = e.target.value === '' ? null : Math.max(x.start + 0.1, +e.target.value));
+$('imDel').onclick = () => { S.texts = S.texts.filter(x => x.id !== S.selText); S.selText = null; refresh(); toast('Görsel silindi'); };
 $('txText').oninput = tx((x,e) => x.text = e.target.value);
 $('txFont').onchange = tx((x,e) => { x.font = e.target.value; loadFont(x.font); });
 $('txSize').oninput = tx((x,e) => x.size = +e.target.value);
@@ -1742,7 +1853,7 @@ $('btnReset').onclick = () => {
   if (S.music) S.music.el.pause();
   Object.assign(S, {clips:[], texts:[], vo:null, music:null, sel:null, selText:null, t:0, cur:0});
   if (S.music) S.music.el.pause(); S.music = null;
-  for (const o of [MEDIA, CLIPS, VOS, MUS]) for (const k in o) delete o[k];
+  for (const o of [MEDIA, CLIPS, VOS, MUS, IMGS]) for (const k in o) delete o[k];
   store.clear(); hist.length = 0; hIdx = -1; lastSaved = '';
   $('btnReset').textContent = 'Sıfırla'; resetArm = 0; refresh(); toast('Proje sıfırlandı');
 };
@@ -1789,7 +1900,7 @@ function snapshot(){
   const o = {v:1};
   for (const k of LOOK) o[k] = S[k];
   o.duck = {...S.duck};
-  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0}; });
+  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false}; });
   o.texts = S.texts.map(({_bb, ...x}) => x);
   o.music = S.music ? {aid:S.music.aid, name:S.music.name, vol:S.music.vol, start:S.music.start, loop:S.music.loop, fadeIn:S.music.fadeIn, fadeOut:S.music.fadeOut, duck:S.music.duck} : null;
   o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
@@ -1873,7 +1984,8 @@ async function restoreProject(){
     const blob = await store.get('m:' + mid);
     if (blob) try { await loadMedia(blob, blob.name || 'video', mid); } catch(e){}
   }
-  uid = Math.max(uid, ...o.clips.map(c => c.id + 1), ...mids.map(m => m + 1), ...o.texts.map(x => x.id + 1), o.vo ? o.vo.vid + 1 : 0, o.music ? o.music.aid + 1 : 0);
+  for (const x of o.texts) if (x.kind === 'img'){ const b = await store.get('i:' + x.imgId); if (b) try { await loadImgBlob(b, x.imgId); } catch(e){} }
+  uid = Math.max(uid, ...o.texts.filter(x => x.kind === 'img').map(x => x.imgId + 1), ...o.clips.map(c => c.id + 1), ...mids.map(m => m + 1), ...o.texts.map(x => x.id + 1), o.vo ? o.vo.vid + 1 : 0, o.music ? o.music.aid + 1 : 0);
   if (o.music){
     const mb = await store.get('a:' + o.music.aid);
     if (mb){ const {aid, name, ...props} = o.music; await setMusic(mb, name, {aid, restoring:true, props}); }
@@ -1886,7 +1998,7 @@ async function restoreProject(){
   if (S.vo) await renderVO();
   hist.length = 0; hist.push(snapshot()); hIdx = 0; lastSaved = j; updUndo();
   // artık kullanılmayan dosyaları temizle
-  const used = new Set(['project', ...mids.map(m => 'm:' + m), ...(o.vo ? ['v:' + o.vo.vid] : []), ...(o.music ? ['a:' + o.music.aid] : [])]);
+  const used = new Set(['project', ...mids.map(m => 'm:' + m), ...(o.vo ? ['v:' + o.vo.vid] : []), ...(o.music ? ['a:' + o.music.aid] : []), ...o.texts.filter(x => x.kind === 'img').map(x => 'i:' + x.imgId)]);
   for (const k of await store.keys()) if (!used.has(k)) store.del(k);
   ready = true;
   $('saveState').textContent = 'Kaydedildi';
