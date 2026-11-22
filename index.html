@@ -123,7 +123,17 @@ footer{border-top:1px solid var(--line);background:var(--panel)}
 .track.small{height:28px}
 .blk{position:absolute;top:3px;bottom:3px;background:var(--clip);color:#fff;border-radius:6px;overflow:hidden;padding:3px 7px;font-size:11px;font-weight:600;white-space:nowrap;border:2px solid transparent}
 .blk.sel{border-color:#171a21;background:var(--clipSel)}
-.blk.t{background:var(--txtClip)}
+.blk.t{background:var(--txtClip);cursor:grab;touch-action:none}
+#trTexts .blk:before,#trTexts .blk:after{content:"";position:absolute;top:4px;bottom:4px;width:3px;border-radius:2px;background:rgba(255,255,255,.75);opacity:0;transition:opacity .12s}
+#trTexts .blk:before{left:2px} #trTexts .blk:after{right:2px}
+#trTexts .blk:hover:before,#trTexts .blk:hover:after,#trTexts .blk.sel:before,#trTexts .blk.sel:after{opacity:1}
+#trTexts .blk.dragging{opacity:.8;box-shadow:0 6px 16px rgba(23,26,33,.25);z-index:3}
+#ruler{touch-action:none}
+#ph{cursor:ew-resize}
+.zoomCtl{display:flex;align-items:center;gap:2px}
+.zoomCtl input{width:110px}
+.zoomCtl button{min-height:28px;min-width:28px;padding:2px 8px}
+#snapLine{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed var(--acc);pointer-events:none;z-index:6;display:none}
 .blk small{display:block;opacity:.8;font-weight:500}
 #trMusic .blk{background:#22a06b;color:#fff;cursor:default}
 #trVO .blk{background:#f08a3c;padding:0;cursor:grab;touch-action:none}
@@ -614,8 +624,12 @@ label.chk input{width:16px;flex:0 0 auto}
     <button id="bDup" title="Seçili klibi çoğalt" hidden>Çoğalt</button>
     <span class="sp"></span>
     <span class="mono" id="tlInfo">0 klip</span>
-    <label style="margin:0 0 0 8px" hidden>Yakınlık</label>
-    <input type="range" id="tlZoom" min="10" max="200" value="60" style="width:110px" hidden>
+    <div class="zoomCtl" title="Yakınlaştır: Cmd/Ctrl + fare tekerleği">
+      <button id="tlOut" class="ghost" aria-label="Uzaklaştır">−</button>
+      <input type="range" id="tlZoom" min="10" max="300" value="60" aria-label="Zaman çizelgesi yakınlığı">
+      <button id="tlIn" class="ghost" aria-label="Yakınlaştır">+</button>
+      <button id="tlFit" class="ghost" title="Tüm projeyi sığdır">Sığdır</button>
+    </div>
   </div>
   <div id="tlScroll">
     <div id="tl">
@@ -624,7 +638,7 @@ label.chk input{width:16px;flex:0 0 auto}
       <div class="track small" id="trTexts"></div>
       <div class="track small" id="trVO"></div>
       <div class="track small" id="trMusic"></div>
-      <div id="ph"></div>
+      <div id="ph"></div><div id="snapLine"></div>
     </div>
   </div>
 </footer>
@@ -1538,19 +1552,88 @@ $('trClips').addEventListener('pointermove', e => {
   $('trClips').style.cursor = tdrag.edge === 'M' ? 'grabbing' : 'ew-resize';
   if (tdrag.edge !== 'M'){ const off = offsets()[S.clips.indexOf(c)]; seek(tdrag.edge === 'L' ? off : off + len(c) - 0.04); }
 });
-const tEnd = () => { if (!tdrag) return; if (tdrag.moved){ tMoved = true; S.sel = tdrag.c.id; seek(Math.min(S.t, total())); refresh(); } tdrag = null; $('trClips').style.cursor = ''; };
+const tEnd = () => { if (!tdrag) return; if (tdrag.moved){ tMoved = true; S.sel = tdrag.c.id; seek(Math.min(S.t, total())); refresh(); captureNow(); } tdrag = null; $('trClips').style.cursor = ''; };
 $('trClips').addEventListener('pointerup', tEnd); $('trClips').addEventListener('pointercancel', tEnd);
 $('trClips').addEventListener('click', e => {
   if (tMoved){ tMoved = false; return; }
   const b = e.target.closest('.blk'); if (b){ S.sel = +b.dataset.id; S.focus = 'clip'; }
   seek(timeFromEvent(e)); refresh();
 });
+// Yapışma noktaları: başlangıç, son, oynatma çizgisi, klip sınırları, diğer yazıların uçları
+function snapPoints(exceptId){
+  const pts = [0, total(), S.t], off = offsets();
+  S.clips.forEach((c, i) => pts.push(off[i], off[i] + len(c)));
+  for (const o of S.texts) if (o.id !== exceptId){ pts.push(o.start); if (o.end != null) pts.push(o.end); }
+  return pts;
+}
+function snapT(t, pts){
+  const tol = 8 / S.pps; let best = null;
+  for (const q of pts) if (Math.abs(q - t) <= tol && (best == null || Math.abs(q - t) < Math.abs(best - t))) best = q;
+  $('snapLine').style.display = best == null ? 'none' : 'block'; if (best != null) $('snapLine').style.left = (best * S.pps) + 'px';
+  return best == null ? t : best;
+}
+// Yazı / görsel blokları: ortadan sürükle = zamanda kaydır, kenardan sürükle = başı/sonu uzat-kısalt
+let xdrag = null, xMoved = false;
+$('trTexts').addEventListener('pointerdown', e => {
+  const b = e.target.closest('.blk'); if (!b || S.exporting) return;
+  const x = S.texts.find(o => o.id === +b.dataset.tid); if (!x) return;
+  $('trTexts').setPointerCapture(e.pointerId); captureNow();
+  const e0 = x.end == null ? total() : x.end;
+  xdrag = {x, edge: blkEdge(b, e.clientX), x0: e.clientX, s0: x.start, e0, open: x.end == null, moved: false, pts: snapPoints(x.id)};
+  S.selText = x.id; S.focus = 'text';
+});
+$('trTexts').addEventListener('pointermove', e => {
+  if (!xdrag){ const b = e.target.closest('.blk'); $('trTexts').style.cursor = b ? (blkEdge(b, e.clientX) === 'M' ? 'grab' : 'ew-resize') : ''; return; }
+  const d = xdrag, x = d.x, dt = (e.clientX - d.x0) / S.pps, T = Math.max(total(), 0.5);
+  if (Math.abs(e.clientX - d.x0) > 3) d.moved = true; if (!d.moved) return;
+  if (d.edge === 'M'){
+    const dur = d.e0 - d.s0;
+    let st = clamp(d.s0 + dt, 0, Math.max(0, T - dur));
+    const a = snapT(st, d.pts); if (a !== st) st = a; else { const b2 = snapT(st + dur, d.pts); st = b2 - dur; }
+    st = clamp(st, 0, Math.max(0, T - dur));
+    x.start = st; x.end = d.open && st + dur >= T - 0.02 ? null : st + dur;
+  } else if (d.edge === 'L'){
+    x.start = clamp(snapT(d.s0 + dt, d.pts), 0, d.e0 - 0.2);
+  } else {
+    const en = clamp(snapT(d.e0 + dt, d.pts), x.start + 0.2, T);
+    x.end = en >= T - 0.02 ? null : en;   // sona dayanırsa "sona kadar"
+  }
+  drawTimeline(); draw();
+  const blk = $('trTexts').querySelector(`.blk[data-tid="${x.id}"]`); if (blk) blk.classList.add('dragging');
+  $('trTexts').style.cursor = d.edge === 'M' ? 'grabbing' : 'ew-resize';
+});
+const xEnd = () => { if (!xdrag) return; $('snapLine').style.display = 'none';
+  if (xdrag.moved){ xMoved = true; switchTab('R','pText'); refresh(); captureNow(); } xdrag = null; $('trTexts').style.cursor = ''; };
+$('trTexts').addEventListener('pointerup', xEnd); $('trTexts').addEventListener('pointercancel', xEnd);
 $('trTexts').addEventListener('click', e => {
+  if (xMoved){ xMoved = false; return; }
   const b = e.target.closest('.blk'); if (b){ S.selText = +b.dataset.tid; S.focus = 'text'; switchTab('R','pText'); }
   seek(timeFromEvent(e)); refresh();
 });
-$('ruler').addEventListener('click', e => seek(timeFromEvent(e)));
-$('tlZoom').oninput = e => { S.pps = +e.target.value; drawTimeline(); updTime(); };
+// Oynatma çizgisi: cetvelde ya da çizginin üstünde sürükleyerek sar
+let scrub = false;
+const scrubTo = e => { const t = clamp(timeFromEvent(e), 0, total()); seek(t); };
+$('ruler').addEventListener('pointerdown', e => { scrub = true; $('ruler').setPointerCapture(e.pointerId); stop(); scrubTo(e); });
+$('ruler').addEventListener('pointermove', e => { if (scrub) scrubTo(e); });
+$('ruler').addEventListener('pointerup', () => { scrub = false; });
+$('ruler').addEventListener('pointercancel', () => { scrub = false; });
+// Yakınlaştırma: kaydırıcı, − + butonları, Cmd/Ctrl + tekerlek (imlecin altındaki an sabit kalır), Sığdır
+function setZoom(pps, anchorClientX){
+  const sc = $('tlScroll'), r = sc.getBoundingClientRect();
+  const ax = anchorClientX == null ? r.left + sc.clientWidth/2 : anchorClientX;
+  const tAt = (sc.scrollLeft + ax - r.left - 14) / S.pps;
+  S.pps = clamp(pps, 10, 300); $('tlZoom').value = Math.round(S.pps);
+  drawTimeline(); updTime();
+  sc.scrollLeft = Math.max(0, tAt * S.pps - (ax - r.left - 14));
+}
+$('tlZoom').oninput = e => setZoom(+e.target.value);
+$('tlIn').onclick = () => setZoom(S.pps * 1.4);
+$('tlOut').onclick = () => setZoom(S.pps / 1.4);
+$('tlFit').onclick = () => { const w = $('tlScroll').clientWidth - 60; setZoom(w / Math.max(1, total(), S.vo ? S.vo.offset + S.vo.dur : 0)); $('tlScroll').scrollLeft = 0; };
+$('tlScroll').addEventListener('wheel', e => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault(); setZoom(S.pps * Math.exp(-e.deltaY * 0.0025), e.clientX);
+}, {passive: false});
 
 // ---------- sekmeler ----------
 function switchTab(group, id){
@@ -2357,7 +2440,7 @@ function undo(){ captureNow(); if (hIdx <= 0) return toast('Geri alınacak bir �
 function redo(){ if (hIdx >= hist.length - 1) return; hIdx++; applySnap(hist[hIdx]); updUndo(); toast('Yinelendi'); }
 $('btnUndo').onclick = undo; $('btnRedo').onclick = redo;
 setInterval(() => {
-  if (!ready || applying || S.exporting || recording || drag || tdrag) return;
+  if (!ready || applying || S.exporting || recording || drag || tdrag || xdrag || scrub) return;
   const j = snapshot();
   if (j !== hist[hIdx]){ hist.splice(hIdx + 1); hist.push(j); if (hist.length > 120) hist.shift(); hIdx = hist.length - 1; updUndo(); }
 }, 400);
