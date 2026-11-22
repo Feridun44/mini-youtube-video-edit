@@ -34,3 +34,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - Dışa aktarma gerçek zamanlıdır: 30 sn'lik video yaklaşık 30 sn sürer, sekmeyi açık tut.
 - Fontlar: Anton, Bebas Neue, Montserrat, Poppins Google Fonts'tan yüklenir (SIL Open Font License). Impact, Arial ve Georgia sistem fontlarıdır, bilgisayarında yoksa yedek font kullanılır.
 - Bu proje YouTube veya Google ile bağlantılı değildir.
+
+## Lisans
+
+MIT. Ayrıntılar için [LICENSE](LICENSE) dosyasına bak.
