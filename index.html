@@ -626,6 +626,13 @@ label.chk input{width:16px;flex:0 0 auto}
         <button data-fmt="1:1"><b>Kare</b><small>1:1 · 1080×1080</small></button>
       </div>
       <button id="toShort" class="primary" style="width:100%;margin-top:8px">Shorts'a çevir · 9:16 tam ekran</button>
+      <div class="card" style="margin-top:12px;padding:10px">
+        <label style="margin-top:0">Kırpma, yakınlaştırma, filtre ve renk ayarları</label>
+        <div class="opts" id="lookScope" style="grid-template-columns:1fr 1fr">
+          <button data-sc="clip" class="on"><b>Seçili klip</b><small id="lookScopeName">Sadece bu klip değişir</small></button>
+          <button data-sc="all"><b>Tüm klipler</b><small>Hepsi birlikte değişir</small></button>
+        </div>
+      </div>
       <h3 style="margin-top:12px">Videoyu kırp</h3>
       <p class="hint" style="margin-top:0" id="cropHint">Seçili klibin kenarlarını kes. Altta bozuk kısım, yazı ya da logo varsa Alt'ı artır.</p>
       <label>Üst <span id="cropTV">0%</span></label><input type="range" id="cropT" min="0" max="45" value="0">
@@ -959,9 +966,9 @@ async function cutSilence(c){
     if (c.out - p > 0.1) keep.push([p, c.out]);
     if (!keep.length) return toast('Klipte konuşma bulunamadı');
     captureNow();
-    const before = c.out - c.in, i = S.clips.indexOf(c);
+    const before = c.out - c.in, i = S.clips.indexOf(c), st = timeState();
     const parts = keep.map(([a, b], j) => j === 0 ? Object.assign(c, {in: a, out: b}) : {...c, id: uid++, in: a, out: b, trans: 'none', label: ''});
-    S.clips.splice(i, 1, ...parts); S.sel = c.id;
+    S.clips.splice(i, 1, ...parts); applyTime(st); S.sel = c.id;
     const saved = before - keep.reduce((s, [a, b]) => s + b - a, 0);
     refresh(); seek(offsets()[i] + 0.001); captureNow();
     toast(`${cuts.length} sessiz yer kesildi · kaynakta ${saved.toFixed(1)} sn kısaldı`);
@@ -980,6 +987,7 @@ $('styleBtns').onclick = e => { const b = e.target.closest('button'); if (!b) re
   captureNow();
   retime(() => { for (const c of S.clips){ c.trans = 'auto'; if (!c.el.isPhoto){ c.speed = st.speed; c.ramp = st.ramp; } } });
   S.transType = st.trans; S.transDur = st.dur; S.filter = st.filter; S.vig = st.vig;
+  for (const c of S.clips) if (c.look) c.look = {...c.look, filter: st.filter, vig: st.vig};
   syncControls(); seek(0); refresh(); captureNow(); toast(st.msg); };
 $('transDur').oninput = e => { S.transDur = e.target.value/10; $('transDurV').textContent = S.transDur.toFixed(1) + ' sn'; draw(); };
 $('fileVideo').onchange = e => { addVideoFiles([...e.target.files]); e.target.value = ''; };
@@ -1248,6 +1256,8 @@ function drawTransition(W, H){
 }
 // Videonun tuvaldeki yeri: kırpmada kaplar, diğer modlarda sığar; pan ile kaydırılır
 // Kırpma: kaynağın kenarlarından kesilen oran (0–0.45); kırpılan kısım hiç çizilmez
+// Görünüm: klibin kendi ayarı, yoksa genel varsayılan (S)
+function lookOf(c){ const L = {}; for (const k of LK) L[k] = c && c.look && k in c.look ? c.look[k] : S[k]; return L; }
 const cropOf = c => { const k = c.crop || {}; return {t:k.t||0, b:k.b||0, l:k.l||0, r:k.r||0}; };
 const hasCrop = c => { const k = cropOf(c); return k.t + k.b + k.l + k.r > 0; };
 function srcRect(c){
@@ -1257,13 +1267,13 @@ function srcRect(c){
 const blit = (g, src, s, x, y, w, h) => g.drawImage(src, s.sx, s.sy, s.sw, s.sh, x, y, w, h);
 function videoRect(c, W, H){
   const s0 = srcRect(c), vw = s0.sw, vh = s0.sh;
-  const sc = (S.fit === 'fill' ? Math.max(W/vw, H/vh) : Math.min(W/vw, H/vh)) * S.zoom;
+  const sc = (S.fit === 'fill' ? Math.max(W/vw, H/vh) : Math.min(W/vw, H/vh)) * lookOf(c).zoom;
   const dw = vw*sc, dh = vh*sc, mx = Math.max(0, (dw - W)/2), my = Math.max(0, (dh - H)/2);
   return {x: (W-dw)/2 - (c.panX||0)*mx, y: (H-dh)/2 - (c.panY||0)*my, w: dw, h: dh, mx, my};
 }
 const bgCv = document.createElement('canvas'), bgCtx = bgCv.getContext('2d');
 function drawVideo(c, W, H){
-  const look = `brightness(${S.bright}%) contrast(${S.contrast}%) saturate(${S.sat}%)` + filterCss();
+  const LKc = lookOf(c), look = `brightness(${LKc.bright}%) contrast(${LKc.contrast}%) saturate(${LKc.sat}%)` + filterCss(LKc);
   let r = videoRect(c, W, H); const gaps = r.x > 0.5 || r.y > 0.5 || r.x + r.w < W - 0.5 || r.y + r.h < H - 0.5;
   const src = c.el.img || c.el, s = srcRect(c);
   const mv = c.move || 'none';
@@ -1307,7 +1317,7 @@ function drawVideo(c, W, H){
   ctx.filter = look;
   blit(ctx, src, s, r.x, r.y, r.w, r.h);
   ctx.filter = 'none';
-  filterOverlay(W, H);
+  filterOverlay(W, H, LKc);
   drawOfx(W, H);
   if (gaps && (S.fit === 'blur' || S.fit === 'mirror')){
     // video kenarına ince gölge: arka plandan ayrışsın
@@ -1328,8 +1338,8 @@ const FILTERS = {
   drama:   {con:1.35, sat:0.8,  bri:0.9, vig:0.45},
   fade:    {con:0.82, sat:0.85, bri:1.08, tint:['#e8e0d0', 0.12]},
 };
-function filterCss(){
-  const f = FILTERS[S.filter] || {}, k = S.filterAmt; if (!k || S.filter === 'none') return '';
+function filterCss(L){
+  const f = FILTERS[L.filter] || {}, k = L.filterAmt; if (!k || L.filter === 'none') return '';
   return ` contrast(${lerp(1, f.con ?? 1, k).toFixed(3)}) saturate(${lerp(1, f.sat ?? 1, k).toFixed(3)}) brightness(${lerp(1, f.bri ?? 1, k).toFixed(3)})`
     + (f.sepia ? ` sepia(${(f.sepia*k).toFixed(3)})` : '') + (f.gray ? ` grayscale(${(f.gray*k).toFixed(3)})` : '') + (f.hue ? ` hue-rotate(${(f.hue*k).toFixed(1)}deg)` : '');
 }
@@ -1379,8 +1389,8 @@ function drawProgress(W, H){
   ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(0, y, W, h);
   ctx.fillStyle = o.progColor || '#ff2d55'; ctx.fillRect(0, y, W*p, h); ctx.restore();
 }
-function filterOverlay(W, H){
-  const f = FILTERS[S.filter] || {}, k = S.filter === 'none' ? 0 : S.filterAmt;
+function filterOverlay(W, H, L){
+  const f = FILTERS[L.filter] || {}, k = L.filter === 'none' ? 0 : L.filterAmt;
   ctx.save();
   if (k && (f.tint || f.tint2)){
     ctx.globalCompositeOperation = 'soft-light';
@@ -1390,7 +1400,7 @@ function filterOverlay(W, H){
     } else { ctx.globalAlpha = f.tint[1] * k * 2.5; ctx.fillStyle = f.tint[0]; ctx.fillRect(0, 0, W, H); }
     ctx.globalCompositeOperation = 'source-over';
   }
-  const v = Math.min(1, S.vig + (f.vig || 0) * k);
+  const v = Math.min(1, L.vig + (f.vig || 0) * k);
   if (v > 0.001){
     const R0 = Math.hypot(W, H) / 2, g = ctx.createRadialGradient(W/2, H/2, R0*0.45, W/2, H/2, R0);
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${(0.85*v).toFixed(3)})`);
@@ -1695,7 +1705,8 @@ function refresh(){
   cv.style.setProperty('--ar', W + '/' + H);
   $('optBlur').style.display = S.fit === 'blur' ? 'block' : 'none';
   $('optColor').style.display = S.fit === 'fit' ? 'block' : 'none';
-  $('optPan').style.display = (S.fit === 'fill' || S.zoom > 1) ? 'block' : 'none';
+  $('optPan').style.display = (S.fit === 'fill' || lookOf(cropClip()).zoom > 1) ? 'block' : 'none';
+  syncLook();
   { const c = cropClip(), k = c ? cropOf(c) : {t:0,b:0,l:0,r:0};
     for (const K of 'TBLR'){ const v = Math.round(k[K.toLowerCase()]*100), el = $('crop'+K); el.disabled = !c;
       if (document.activeElement !== el) el.value = v; $('crop'+K+'V').textContent = v + '%'; }
@@ -1872,7 +1883,7 @@ $('trClips').addEventListener('pointerdown', e => {
   const b = e.target.closest('.blk'); if (!b || S.exporting) return;
   const c = S.clips.find(o => o.id === +b.dataset.id); if (!c) return;
   stop(); $('trClips').setPointerCapture(e.pointerId);
-  tdrag = {c, edge: blkEdge(b, e.clientX), x0: e.clientX, in0: c.in, out0: c.out, moved: false};
+  tdrag = {c, edge: blkEdge(b, e.clientX), x0: e.clientX, in0: c.in, out0: c.out, moved: false, ts: timeState()};
 });
 $('trClips').addEventListener('pointermove', e => {
   if (!tdrag){ const b = e.target.closest('.blk'); $('trClips').style.cursor = b ? (blkEdge(b, e.clientX) === 'M' ? 'grab' : 'ew-resize') : ''; return; }
@@ -1885,6 +1896,7 @@ $('trClips').addEventListener('pointermove', e => {
     for (let k = 0; k < others.length; k++){ const L = len(others[k]); if (t < acc + L/2){ idx = k; break; } acc += L; }
     const cur = S.clips.indexOf(c); if (idx !== cur){ S.clips.splice(cur, 1); S.clips.splice(idx, 0, c); }
   }
+  applyTime(tdrag.ts);
   S.sel = c.id; S.focus = 'clip'; drawTimeline();
   const blk = $('trClips').querySelector(`.blk[data-id="${c.id}"]`); if (blk) blk.classList.add('dragging');
   $('trClips').style.cursor = tdrag.edge === 'M' ? 'grabbing' : 'ew-resize';
@@ -2007,7 +2019,7 @@ $('bSplit').onclick = () => {
 const UNDO_HINT = navigator.platform.includes('Mac') ? 'Cmd+Z' : 'Ctrl+Z';
 function deleteClip(c){
   const i = S.clips.indexOf(c); if (i < 0) return;
-  captureNow(); stop(); S.clips.splice(i, 1); c.el.pause(); // öğe geri al için saklanır
+  captureNow(); stop(); retime(() => S.clips.splice(i, 1)); c.el.pause(); // öğe geri al için saklanır
   S.sel = S.clips[Math.min(i, S.clips.length-1)]?.id ?? null; S.focus = S.sel != null ? 'clip' : null;
   seek(Math.min(S.t, total())); refresh(); captureNow(); toast(`Klip silindi · geri almak için ${UNDO_HINT}`);
 }
@@ -2024,9 +2036,9 @@ function deleteFocused(){
   toast('Silmek için önce bir öğe seç');
 }
 $('bDel').onclick = () => deleteFocused();
-$('bLeft').onclick = () => withSel((c, i) => { if (i === 0) return; S.clips.splice(i,1); S.clips.splice(i-1,0,c); seek(offsets()[i-1]); });
-$('bRight').onclick = () => withSel((c, i) => { if (i === S.clips.length-1) return; S.clips.splice(i,1); S.clips.splice(i+1,0,c); seek(offsets()[i+1]); });
-$('bDup').onclick = () => withSel((c, i) => { const n = {...c, id: uid++}; S.clips.splice(i+1, 0, n); S.sel = n.id; toast('Klip çoğaltıldı'); });
+$('bLeft').onclick = () => withSel((c, i) => { if (i === 0) return; retime(() => { S.clips.splice(i,1); S.clips.splice(i-1,0,c); }); seek(offsets()[i-1]); });
+$('bRight').onclick = () => withSel((c, i) => { if (i === S.clips.length-1) return; retime(() => { S.clips.splice(i,1); S.clips.splice(i+1,0,c); }); seek(offsets()[i+1]); });
+$('bDup').onclick = () => withSel((c, i) => { const n = {...c, id: uid++}; retime(() => S.clips.splice(i+1, 0, n)); S.sel = n.id; toast('Klip çoğaltıldı'); });
 
 function setIn(c, v){ c.in = clamp(v, 0, c.out - 0.1); }
 function setOut(c, v){ c.out = clamp(v, c.in + 0.1, c.dur); }
@@ -2058,24 +2070,41 @@ function loadFont(f){ if (document.fonts && document.fonts.load) document.fonts.
 function changeSpeed(c, fn){ fn(c); c.speed = clamp(+(c.speed || 1).toFixed(3), 0.1, 5); }
 // Klip süresi değişince (hız, kırpma, fotoğraf süresi) sonraki klipler kayar.
 // Oynatma çubuğu, yazılar, görseller, altyazılar ve seslendirme bağlı oldukları kareyle birlikte taşınır.
-function retime(fn){
-  const old = S.clips.map(c => ({c, in: c.in, m: mapOf(c), L: len(c)})), oldOff = [];
-  let o = 0; for (const x of old){ oldOff.push(o); o += x.L; } const oldT = o;
-  fn();
-  const newOff = offsets(), newT = total(), idx = new Map(S.clips.map((c, i) => [c, i]));
+function timeState(){
+  const old = S.clips.map(c => ({c, in: c.in, m: mapOf(c), L: len(c)})), off = [];
+  let o = 0; for (const x of old){ off.push(o); o += x.L; }
+  return {old, off, T: o, t: S.t, vo: S.vo ? S.vo.offset : null,
+    texts: S.texts.map(x => [x, x.start, x.end]), subs: S.subs.items.map(c => [c, c.start, c.end])};
+}
+// st'deki (değişiklik öncesi) zamanları, aynı kareye denk gelen yeni zamanlara taşı
+function applyTime(st){
+  const {old, off} = st, newOff = offsets(), newT = total(), idx = new Map(S.clips.map((c, i) => [c, i]));
   const map = t => {
     if (t == null || !old.length) return t;
-    if (t >= oldT - 1e-6) return t - oldT + newT; // videonun sonrası: aynı farkla kaydır
-    let i = 0; while (i < old.length - 1 && t >= oldOff[i] + old[i].L) i++;
-    const x = old[i], j = idx.get(x.c); if (j == null) return t;
-    const src = x.in + x.m.toSrc(clamp(t - oldOff[i], 0, x.L));
-    return newOff[j] + mapOf(x.c).toLocal(src - x.c.in);
+    if (t >= st.T - 1e-6) return t - st.T + newT; // videonun sonrası: aynı farkla kaydır
+    let i = 0; while (i < old.length - 1 && t >= off[i] + old[i].L) i++;
+    const x = old[i], src = x.in + x.m.toSrc(clamp(t - off[i], 0, x.L));
+    let j = idx.get(x.c);
+    if (j == null){ // klip silindi: yerine gelen klibin başına
+      for (let k = i + 1; k < old.length; k++){ const n = idx.get(old[k].c); if (n != null) return newOff[n]; }
+      return newT;
+    }
+    let c = S.clips[j];
+    if (src < c.in - 1e-6 || src > c.out + 1e-6){ // kare bu klipten çıktıysa (ör. sessizlik kesme) aynı dosyanın onu içeren parçasını bul
+      let best = -1;
+      S.clips.forEach((o, k) => { if (o.mid === c.mid && src >= o.in - 1e-6 && src <= o.out + 1e-6 && (best < 0 || Math.abs(k - j) < Math.abs(best - j))) best = k; });
+      if (best >= 0){ j = best; c = S.clips[j]; }
+    }
+    return newOff[j] + mapOf(c).toLocal(clamp(src, c.in, c.out) - c.in);
   };
-  for (const x of S.texts){ x.start = map(x.start); if (x.end != null) x.end = Math.max(x.start + 0.05, map(x.end)); }
-  for (const cue of S.subs.items){ cue.start = map(cue.start); cue.end = Math.max(cue.start + 0.05, map(cue.end)); }
-  if (S.vo && S.vo.offset >= 0) S.vo.offset = map(S.vo.offset);
-  S.t = clamp(map(S.t), 0, newT);
+  for (const [x, a, b] of st.texts){ x.start = map(a); if (b != null) x.end = Math.max(x.start + 0.05, map(b)); }
+  for (const [cue, a, b] of st.subs){ cue.start = map(a); cue.end = Math.max(cue.start + 0.05, map(b)); }
+  if (S.vo && st.vo != null) S.vo.offset = map(st.vo);
+  S.t = clamp(map(st.t), 0, newT);
 }
+// Klip süresi ya da sırası değişince (hız, kırpma, taşıma, silme, çoğaltma) sonraki klipler kayar.
+// Oynatma çubuğu, yazılar, görseller, altyazılar ve seslendirme bağlı oldukları kareyle birlikte taşınır.
+function retime(fn){ const st = timeState(); fn(); applyTime(st); }
 function speedSel(fn){
   const c = selClip(); if (!c) return toast('Önce bir klip seç'); if (c.el.isPhoto) return toast('Fotoğrafın hızı yok; süresini ayarla');
   withSel(c2 => retime(() => changeSpeed(c2, fn))); seek(Math.min(S.t, total()));
@@ -2182,7 +2211,8 @@ function cropClip(){ return selClip() || S.clips[S.cur]; }
 for (const K of 'TBLR'){
   const el = $('crop'+K), key = K.toLowerCase();
   el.oninput = () => { const c = cropClip(); if (!c) return;
-    c.crop = {...cropOf(c), [key]: el.value/100}; $('crop'+K+'V').textContent = el.value + '%'; draw(); };
+    const v = el.value/100; for (const o of (lookScope === 'all' ? S.clips : [c])) o.crop = {...cropOf(o), [key]: v};
+    $('crop'+K+'V').textContent = el.value + '%'; draw(); };
   el.addEventListener('change', () => { captureNow(); refresh(); });
 }
 $('cropReset').onclick = () => { const c = cropClip(); if (!c) return; captureNow(); c.crop = {t:0,b:0,l:0,r:0}; refresh(); draw(); captureNow(); toast('Kırpma sıfırlandı'); };
@@ -2194,14 +2224,34 @@ $('toShort').onclick = () => { captureNow(); S.fmt = '9:16'; S.fit = 'fill';
   refresh(); draw(); captureNow(); toast('9:16 tam ekran: önizlemede videoyu sürükleyip görünen kısmı seç'); };
 $('panReset').onclick = () => { const c = S.clips[S.cur]; if (!c) return; c.panX = c.panY = 0; draw(); toast('Video ortalandı'); };
 $('bgColor').oninput = e => { S.bg = e.target.value; draw(); };
-function slider(id, key, scale){ $(id).oninput = e => { S[key] = +e.target.value * (scale||1); $(id+'V').textContent = e.target.value + '%'; draw(); }; }
+// görünüm ayarı: kapsam "Seçili klip" ise yalnızca o klibe, "Tüm klipler" ise hepsine yazılır
+var lookScope = 'clip';
+function setLook(vals){
+  const c = cropClip();
+  if (lookScope === 'all' || !c){ Object.assign(S, vals); for (const o of S.clips) if (o.look) o.look = {...o.look, ...vals}; }
+  else c.look = {...(c.look || {}), ...vals};
+  draw();
+}
+function syncLook(){
+  const L = lookOf(cropClip()), act = document.activeElement;
+  const sr = (id, v, txt) => { if (act !== $(id)) setRange(id, v, txt); };
+  sr('zoom', Math.round(L.zoom*100), Math.round(L.zoom*100)+'%');
+  $('fxPreset').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.f === L.filter));
+  sr('fxAmt', Math.round(L.filterAmt*100), Math.round(L.filterAmt*100)+'%');
+  sr('vig', Math.round(L.vig*100), Math.round(L.vig*100)+'%');
+  for (const k of ['bright','contrast','sat']) sr(k, L[k], L[k]+'%');
+  const c = cropClip(); $('lookScopeName').textContent = c && lookScope === 'clip' ? c.name : 'Sadece bu klip değişir';
+}
+$('lookScope').onclick = e => { const b = e.target.closest('button'); if (!b) return; lookScope = b.dataset.sc;
+  $('lookScope').querySelectorAll('button').forEach(o => o.classList.toggle('on', o === b)); syncLook(); };
+function slider(id, key, scale){ $(id).oninput = e => { setLook({[key]: +e.target.value * (scale||1)}); $(id+'V').textContent = e.target.value + '%'; }; }
 slider('bright','bright'); slider('contrast','contrast'); slider('sat','sat'); slider('zoom','zoom',0.01);
 $('zoom').addEventListener('change', () => refresh());
-$('fxPreset').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.filter = b.dataset.f;
+$('fxPreset').onclick = e => { const b = e.target.closest('button'); if (!b) return; setLook({filter: b.dataset.f});
   $('fxPreset').querySelectorAll('button').forEach(o => o.classList.toggle('on', o === b)); draw(); };
-$('fxAmt').oninput = e => { S.filterAmt = e.target.value/100; $('fxAmtV').textContent = e.target.value + '%'; draw(); };
-$('vig').oninput = e => { S.vig = e.target.value/100; $('vigV').textContent = e.target.value + '%'; draw(); };
-$('lookReset').onclick = () => { S.filter = 'none'; S.filterAmt = 1; S.vig = 0; syncControls(); for (const k of ['bright','contrast','sat']){ S[k] = 100; $(k).value = 100; $(k+'V').textContent = '100%'; } S.zoom = 1; $('zoom').value = 100; $('zoomV').textContent = '100%'; draw(); toast('Renkler sıfırlandı'); };
+$('fxAmt').oninput = e => { setLook({filterAmt: e.target.value/100}); $('fxAmtV').textContent = e.target.value + '%'; };
+$('vig').oninput = e => { setLook({vig: e.target.value/100}); $('vigV').textContent = e.target.value + '%'; };
+$('lookReset').onclick = () => { setLook({filter:'none', filterAmt:1, vig:0, bright:100, contrast:100, sat:100, zoom:1}); syncLook(); refresh(); toast(lookScope === 'all' ? 'Tüm kliplerin renkleri sıfırlandı' : 'Bu klibin renkleri sıfırlandı'); };
 
 // ---------- altyazı paneli ----------
 const fmtSrt = t => { t = Math.max(0, t); const h = Math.floor(t/3600), m = Math.floor(t%3600/60), s = Math.floor(t%60), ms = Math.round((t%1)*1000);
@@ -2751,12 +2801,13 @@ const store = (() => {
 })();
 
 // ---------- proje durumu: kaydet / geri yükle / geri al ----------
+const LK = ['filter','filterAmt','vig','bright','contrast','sat','zoom'];
 const LOOK = ['ofx','filter','filterAmt','vig','transType','transDur','fmt','fit','blurAmt','bgDim','safe','bg','zoom','bright','contrast','sat','master','voVol'];
 function snapshot(){
   const o = {v:1};
   for (const k of LOOK) o[k] = S[k];
   o.duck = {...S.duck};
-  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1, ramp:c.ramp || 'none', crop:cropOf(c), trans:c.trans || 'auto', move:c.move || 'none'}; });
+  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1, ramp:c.ramp || 'none', crop:cropOf(c), trans:c.trans || 'auto', move:c.move || 'none', look:c.look ? {...c.look} : null}; });
   o.texts = S.texts.map(({_bb, ...x}) => x);
   o.music = S.music ? {aid:S.music.aid, name:S.music.name, vol:S.music.vol, start:S.music.start, loop:S.music.loop, fadeIn:S.music.fadeIn, fadeOut:S.music.fadeOut, duck:S.music.duck} : null;
   o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
@@ -2772,11 +2823,7 @@ function syncControls(){
   setRange('blurAmt', Math.round(S.blurAmt*100), Math.round(S.blurAmt*100)+'%');
   setRange('bgDim', Math.round(S.bgDim*100), Math.round(S.bgDim*100)+'%');
   $('safeZone').value = S.safe || ''; $('bgColor').value = S.bg;
-  setRange('zoom', Math.round(S.zoom*100), Math.round(S.zoom*100)+'%');
-  $('fxPreset').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.f === S.filter));
-  setRange('fxAmt', Math.round(S.filterAmt*100), Math.round(S.filterAmt*100)+'%');
-  setRange('vig', Math.round(S.vig*100), Math.round(S.vig*100)+'%');
-  for (const k of ['bright','contrast','sat']) setRange(k, S[k], S[k]+'%');
+  syncLook();
   $('transBtns').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.tr === S.transType));
   setRange('transDur', Math.round(S.transDur*10), S.transDur.toFixed(1) + ' sn');
   setRange('master', Math.round(S.master*100), Math.round(S.master*100)+'%');
