@@ -239,6 +239,15 @@ label.chk input{width:16px;flex:0 0 auto}
       <div id="drop">Video ve fotoğrafları buraya sürükle ya da <b>tıkla ve seç</b><br><small>Birden fazla dosya ekleyebilirsin; sırayla birleşir.</small></div>
       <input type="file" id="fileVideo" accept="video/*,image/*" multiple hidden>
       <div class="list" id="clipList"></div>
+      <div id="styleBox" style="margin-top:14px">
+        <h3>Hazır edit stili</h3>
+        <div class="opts opts3" id="styleBtns">
+          <button data-st="slow"><b>Slow edit</b><small>Ağır çekim · bulanık geçiş</small></button>
+          <button data-st="velocity"><b>Velocity</b><small>Hız rampası · zoom vuruşu</small></button>
+          <button data-st="cine"><b>Sinematik</b><small>Yavaş biter · ışık sızması</small></button>
+        </div>
+        <p class="hint">Tüm kliplere hız, geçiş ve renk uygular. Beğenmezsen ↶ ile geri al.</p>
+      </div>
       <div id="transBox" style="margin-top:14px">
         <h3>Klipler arası geçiş</h3>
         <div class="opts opts3" id="transBtns">
@@ -248,6 +257,13 @@ label.chk input{width:16px;flex:0 0 auto}
           <button data-tr="flash"><b>Flaş</b><small>Beyaz parlama</small></button>
           <button data-tr="slide"><b>Kaydırma</b><small>Yeni klip sağdan gelir</small></button>
           <button data-tr="zoom"><b>Yakınlaşma</b><small>Hızlı zoom ile geçer</small></button>
+          <button data-tr="blur"><b>Bulanık</b><small>Slow edit klasiği</small></button>
+          <button data-tr="leak"><b>Işık sızması</b><small>Sıcak ışık patlaması</small></button>
+          <button data-tr="whip"><b>Whip pan</b><small>Hızlı savrulma</small></button>
+          <button data-tr="punch"><b>Zoom vuruşu</b><small>Velocity edit</small></button>
+          <button data-tr="spin"><b>Dönme</b><small>Dönerek geçer</small></button>
+          <button data-tr="glitch"><b>Glitch</b><small>Bozulma efekti</small></button>
+          <button data-tr="shake"><b>Sarsıntı</b><small>Darbe etkisi</small></button>
         </div>
         <div id="transDurBox"><label>Geçiş süresi <span id="transDurV">1.0 sn</span></label>
         <input type="range" id="transDur" min="2" max="30" value="10">
@@ -263,6 +279,16 @@ label.chk input{width:16px;flex:0 0 auto}
         <div class="row" style="margin-top:6px">
           <button id="ciInHere" title="Klibin başını oynatma çubuğuna çek">Başı buraya</button>
           <button id="ciOutHere" title="Klibin sonunu oynatma çubuğuna çek">Sonu buraya</button>
+        </div>
+        <div id="ciTransBox">
+          <label>Bu klibe giriş geçişi</label>
+          <select id="ciTrans">
+            <option value="auto">Genel ayar</option><option value="none">Yok (düz kesme)</option>
+            <option value="dissolve">Yumuşak</option><option value="fade">Kararma</option><option value="flash">Flaş</option>
+            <option value="slide">Kaydırma</option><option value="zoom">Yakınlaşma</option><option value="blur">Bulanık</option>
+            <option value="leak">Işık sızması</option><option value="whip">Whip pan</option><option value="punch">Zoom vuruşu</option>
+            <option value="spin">Dönme</option><option value="glitch">Glitch</option><option value="shake">Sarsıntı</option>
+          </select>
         </div>
         <div id="ciPhoto" style="display:none">
           <label>Fotoğraf süresi <span id="ciPDurV">3.0 sn</span></label>
@@ -864,6 +890,19 @@ $('bAdd').onclick = () => $('fileVideo').click();
 $('transBtns').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.transType = b.dataset.tr;
   $('transBtns').querySelectorAll('button').forEach(o => o.classList.toggle('on', o === b));
   if (S.clips.length < 2 && S.transType !== 'none') toast('Geçiş, iki klibin birleştiği yerde görünür'); draw(); };
+$('ciTrans').onchange = e => withSel(c => { c.trans = e.target.value; seek(offsets()[S.clips.indexOf(c)] + 0.001); });
+// hazır edit stilleri: tüm kliplere hız + geçiş + renk
+const STYLES = {
+  slow:     {speed:0.6, ramp:'none',    trans:'blur',  dur:0.8, filter:'cine',  vig:0.25, msg:'Slow edit: 0.6x ağır çekim, bulanık geçiş'},
+  velocity: {speed:1,   ramp:'fastMid', trans:'punch', dur:0.4, filter:'vivid', vig:0.15, msg:'Velocity: ağır · hızlı · ağır, zoom vuruşu'},
+  cine:     {speed:1,   ramp:'slowOut', trans:'leak',  dur:1.2, filter:'cine',  vig:0.3,  msg:'Sinematik: sona doğru ağır çekim, ışık sızması'},
+};
+$('styleBtns').onclick = e => { const b = e.target.closest('button'); if (!b) return; const st = STYLES[b.dataset.st];
+  if (!S.clips.length) return toast('Önce video ekle');
+  captureNow();
+  for (const c of S.clips){ c.trans = 'auto'; if (!c.el.isPhoto){ c.speed = st.speed; c.ramp = st.ramp; } }
+  S.transType = st.trans; S.transDur = st.dur; S.filter = st.filter; S.vig = st.vig;
+  syncControls(); seek(0); refresh(); captureNow(); toast(st.msg); };
 $('transDur').oninput = e => { S.transDur = e.target.value/10; $('transDurV').textContent = S.transDur.toFixed(1) + ' sn'; draw(); };
 $('fileVideo').onchange = e => { addVideoFiles([...e.target.files]); e.target.value = ''; };
 ['dragover','dragenter'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('over'); }));
@@ -1053,39 +1092,78 @@ function draw(){
 const prevCv = document.createElement('canvas'), prevCtx = prevCv.getContext('2d'); let prevTag = -1;
 const tmpCv = document.createElement('canvas'), tmpCtx = tmpCv.getContext('2d');
 const ease = p => p < .5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2)/2;
+// i. klibin girişindeki geçiş: klibe özel seçim, yoksa genel ayar
+function trOf(i){ const c = S.clips[i]; if (!c || i <= 0) return 'none'; return c.trans && c.trans !== 'auto' ? c.trans : S.transType; }
+// geçiş, iki klibin de yarısını geçmesin
+const trDur = i => Math.max(0.1, Math.min(S.transDur, len(S.clips[i])/2, len(S.clips[i-1])/2));
+function curFrame(){ // o ana kadar çizilmiş kareyi (yeni klip) kopyala
+  if (tmpCv.width !== cv.width || tmpCv.height !== cv.height){ tmpCv.width = cv.width; tmpCv.height = cv.height; }
+  tmpCtx.drawImage(cv, 0, 0); return tmpCv;
+}
+function drawZoomed(img, z, rot, W, H){ ctx.save(); ctx.translate(W/2, H/2); if (rot) ctx.rotate(rot); ctx.drawImage(img, -W*z/2, -H*z/2, W*z, H*z); ctx.restore(); }
+// p: yumuşatılmış ilerleme, q: doğrusal ilerleme (0→1), ks: önizleme ölçeği (bulanıklık pikseli için)
+const TRANS = {
+  dissolve(p){ ctx.globalAlpha = 1 - p; ctx.drawImage(prevCv, 0, 0, this.W, this.H); },
+  slide(p){ const {W, H} = this, cur = curFrame(); ctx.drawImage(prevCv, -W*p, 0, W, H); ctx.drawImage(cur, W*(1-p), 0, W, H); },
+  zoom(p){ const z = 1 + (1 - p)*0.35; ctx.globalAlpha = 1 - p; drawZoomed(prevCv, z, 0, this.W, this.H); },
+  blur(p, q, ks){ const {W, H} = this, cur = curFrame(), b = Math.sin(Math.PI*q) * 22 * ks;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.filter = `blur(${b.toFixed(1)}px)`; ctx.drawImage(cur, 0, 0, W, H);
+    ctx.globalAlpha = 1 - p; ctx.drawImage(prevCv, 0, 0, W, H); },
+  leak(p, q){ const {W, H} = this, t = Math.sin(Math.PI*q);
+    ctx.globalAlpha = 1 - p; ctx.drawImage(prevCv, 0, 0, W, H); ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'screen';
+    const x = W*(-0.3 + 1.6*q), y = H*0.35, g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(W, H)*0.75);
+    g.addColorStop(0, `rgba(255,214,150,${0.95*t})`); g.addColorStop(0.35, `rgba(255,120,50,${0.6*t})`); g.addColorStop(1, 'rgba(255,60,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); },
+  whip(p, q, ks){ const {W, H} = this, cur = curFrame(), b = Math.sin(Math.PI*q) * W * 0.025 * ks;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.filter = b > 0.5 ? `blur(${b.toFixed(1)}px)` : 'none';
+    ctx.drawImage(prevCv, -W*p, 0, W, H); ctx.drawImage(cur, W*(1-p), 0, W, H); },
+  punch(p, q, ks){ const {W, H} = this, cur = curFrame(), first = q < 0.5, t = first ? q*2 : 2 - q*2; // 0→1→0
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.filter = `blur(${(t*16*ks).toFixed(1)}px)`; drawZoomed(first ? prevCv : cur, 1 + 0.7*ease(t), 0, W, H); },
+  spin(p, q, ks){ const {W, H} = this, cur = curFrame(), first = q < 0.5, t = first ? q*2 : 2 - q*2;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.filter = `blur(${(t*12*ks).toFixed(1)}px)`;
+    drawZoomed(first ? prevCv : cur, 1 + 1.4*ease(t), (first ? 1 : -1) * ease(t) * Math.PI/2, W, H); },
+  glitch(p, q, ks){ const {W, H} = this, cur = curFrame(), img = q < 0.5 ? prevCv : cur, t = Math.sin(Math.PI*q);
+    ctx.drawImage(img, 0, 0, W, H);
+    for (let j = 0; j < 9; j++){ if (Math.random() < 0.35) continue;
+      const y = Math.random()*H, h = H*(0.02 + Math.random()*0.09), dx = (Math.random() - 0.5) * W * 0.22 * t;
+      ctx.drawImage(img, 0, y*ks, img.width, h*ks, dx, y, W, h); }
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.22*t; const o = W*0.02*t;
+    ctx.drawImage(img, o, 0, W, H); ctx.drawImage(img, -o, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 0.12*t; ctx.fillStyle = Math.random() < 0.5 ? '#ff0055' : '#00e5ff'; ctx.fillRect(0, 0, W, H); },
+  shake(p, q){ const {W, H} = this, cur = curFrame(), a = (1 - q) * (1 - q) * W * 0.045;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(Math.sin(q*70)*a, Math.cos(q*53)*a); drawZoomed(cur, 1.1, Math.sin(q*41)*0.02*(1-q), W, H); ctx.restore(); },
+};
 function drawTransition(W, H){
-  const n = S.clips.length, i = S.cur, type = S.transType;
+  const n = S.clips.length, i = S.cur;
   const local = S.t - offsets()[i], L = len(S.clips[i]);
-  // geçiş, bu klibin ve önceki klibin yarısını geçmesin
-  const d = Math.max(0.1, Math.min(S.transDur, L/2, i > 0 ? len(S.clips[i-1])/2 : Infinity));
-  const incoming = type !== 'none' && i > 0 && local < d;
+  const tin = trOf(i), tout = i < n - 1 ? trOf(i + 1) : 'none';
+  const d = i > 0 ? trDur(i) : 0;
+  const incoming = tin !== 'none' && i > 0 && local < d;
   // gelen geçiş bölgesi dışında, bu klibin karesini sakla
   if (!incoming){
     if (prevCv.width !== cv.width || prevCv.height !== cv.height){ prevCv.width = cv.width; prevCv.height = cv.height; }
     prevCtx.drawImage(cv, 0, 0); prevTag = i;
   }
-  if (type === 'none') return;
+  if (tin === 'none' && tout !== 'fade' && tout !== 'flash') return;
   const hasPrev = prevTag === i - 1;
   ctx.save();
-  if (type === 'fade' || type === 'flash'){
-    const half = type === 'flash' ? Math.min(d, 0.6)/2 : d/2;
-    let a = 0;
-    if (i > 0 && local < half) a = 1 - local/half;
-    if (i < n - 1 && L - local < half) a = Math.max(a, 1 - (L - local)/half);
-    if (a > 0){ ctx.globalAlpha = type === 'flash' ? ease(a) : a; ctx.fillStyle = type === 'flash' ? '#ffffff' : '#000000'; ctx.fillRect(0, 0, W, H); }
-  } else if (incoming && hasPrev){
-    const p = ease(Math.min(1, local/d));
-    if (type === 'dissolve'){ ctx.globalAlpha = 1 - p; ctx.drawImage(prevCv, 0, 0, W, H); }
-    else if (type === 'slide'){
-      // yeni klip sağdan kayarak gelir, eski kare sola kayarak çıkar
-      if (tmpCv.width !== cv.width || tmpCv.height !== cv.height){ tmpCv.width = cv.width; tmpCv.height = cv.height; }
-      tmpCtx.drawImage(cv, 0, 0);
-      ctx.drawImage(prevCv, -W*p, 0, W, H);
-      ctx.drawImage(tmpCv, W*(1-p), 0, W, H);
-    } else if (type === 'zoom'){
-      const z = 1 + (1 - p)*0.35; ctx.globalAlpha = 1 - p;
-      ctx.drawImage(prevCv, (W - W*z)/2, (H - H*z)/2, W*z, H*z);
-    }
+  // kararma / flaş: çıkan klibin sonu + gelen klibin başı
+  const dip = t => t === 'fade' || t === 'flash', halfOf = (t, dd) => t === 'flash' ? Math.min(dd, 0.6)/2 : dd/2;
+  let a = 0, col = '';
+  if (dip(tin) && local < halfOf(tin, d)){ a = 1 - local/halfOf(tin, d); col = tin; }
+  if (dip(tout)){ const h = halfOf(tout, trDur(i + 1)); if (L - local < h && 1 - (L - local)/h > a){ a = 1 - (L - local)/h; col = tout; } }
+  if (a > 0){ ctx.globalAlpha = col === 'flash' ? ease(a) : a; ctx.fillStyle = col === 'flash' ? '#ffffff' : '#000000'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  const fn = TRANS[tin];
+  if (incoming && fn && (hasPrev || tin === 'shake')){
+    const q = Math.min(1, local/d);
+    TRANS.W = W; TRANS.H = H;
+    fn.call(TRANS, ease(q), q, cv.width / W);
   }
   ctx.restore();
 }
@@ -1503,6 +1581,7 @@ function refresh(){
   if (c){
     $('ciName').textContent = c.el.isPhoto ? `${c.name} · fotoğraf` : `${c.name} · kaynak ${c.dur.toFixed(2)} sn`;
     $('ciSpeedBox').style.display = c.el.isPhoto ? 'none' : 'block';
+    $('ciTransBox').style.display = S.clips.indexOf(c) > 0 ? 'block' : 'none'; $('ciTrans').value = c.trans || 'auto';
     const rp = rampOf(c);
     $('ciSpeedV').textContent = `${+spd(c).toFixed(2)}x${rp !== 'none' ? ' · eğrili' : ''} · süre ${len(c).toFixed(1)} sn (kaynak ${(c.out - c.in).toFixed(1)} sn)`;
     $('ciSpeed').querySelectorAll('button').forEach(b => b.classList.toggle('on', Math.abs(+b.dataset.s - spd(c)) < 1e-6));
@@ -2524,7 +2603,7 @@ function snapshot(){
   const o = {v:1};
   for (const k of LOOK) o[k] = S[k];
   o.duck = {...S.duck};
-  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1, ramp:c.ramp || 'none', crop:cropOf(c)}; });
+  o.clips = S.clips.map(c => { CLIPS[c.id] = c; return {id:c.id, mid:c.mid, in:c.in, out:c.out, vol:c.vol, muted:c.muted, label:c.label, panX:c.panX||0, panY:c.panY||0, kb:c.kb !== false, speed:c.speed || 1, ramp:c.ramp || 'none', crop:cropOf(c), trans:c.trans || 'auto'}; });
   o.texts = S.texts.map(({_bb, ...x}) => x);
   o.music = S.music ? {aid:S.music.aid, name:S.music.name, vol:S.music.vol, start:S.music.start, loop:S.music.loop, fadeIn:S.music.fadeIn, fadeOut:S.music.fadeOut, duck:S.music.duck} : null;
   o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
