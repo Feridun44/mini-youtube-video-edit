@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kurgu Masası</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Montserrat:wght@500;800&family=Poppins:wght@700&display=swap">
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#ffffff; --panel2:#f1f3f6; --line:#dfe3e8; --text:#1c2126; --muted:#68727d;
+  --acc:#0f9d76; --acc2:#0c8664; --warn:#c77700; --danger:#d6334a; --clip:#4a8fd4; --clipSel:#2f74c0; --txtClip:#8b5cd6;
+  --field:#ffffff; --onAcc:#ffffff;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--acc)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--acc);color:var(--onAcc);border-color:var(--acc);font-weight:700}
+button.danger{border-color:#f1c3ca;color:var(--danger)}
+button.on{background:var(--acc2);color:var(--onAcc);border-color:var(--acc2)}
+input[type=text],input[type=number],select,textarea{background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 7px;width:100%}
+textarea{resize:vertical;min-height:54px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=color]{width:38px;height:28px;border:1px solid var(--line);border-radius:6px;background:none;padding:1px}
+label{display:block;color:var(--muted);font-size:12px;margin:8px 0 3px}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.row>.auto{flex:0 0 auto}
+h3{margin:4px 0 6px;font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.hint{color:var(--muted);font-size:12px;margin:4px 0}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:10px}
+
+#app{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);height:100vh}
+header{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line)}
+.logo{font-weight:800;letter-spacing:.02em}
+.logo span{color:var(--acc)}
+#info{flex:1;text-align:center;color:var(--muted);font-family:ui-monospace,Menlo,monospace;font-size:12px}
+main{display:grid;grid-template-columns:300px minmax(0,1fr) 300px;gap:10px;padding:10px;min-height:0}
+.panel{background:var(--panel);box-shadow:0 1px 3px rgba(20,30,40,.06);border:1px solid var(--line);border-radius:11px;display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;padding:5px 4px;font-size:12px}
+.tabs button.active{background:var(--acc);color:var(--onAcc);border-color:var(--acc);font-weight:700}
+.pane{padding:10px;overflow:auto;flex:1;display:none}
+.pane.active{display:block}
+
+#stage{display:flex;flex-direction:column;min-height:0}
+#canvasWrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:10px;position:relative}
+#cv{touch-action:none;aspect-ratio:var(--ar,9/16);height:100%;width:auto;max-width:100%;max-height:calc(100vh - 260px);background:#000;border-radius:8px;box-shadow:0 0 0 1px var(--line)}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);pointer-events:none;padding:30px}
+#transport{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--line);flex-wrap:wrap}
+#seek{flex:1;min-width:120px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+
+#drop{border:1.5px dashed var(--line);border-radius:9px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
+#drop.over{border-color:var(--acc);color:var(--acc)}
+.list{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.item{display:flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 8px;cursor:pointer}
+.item.sel{border-color:var(--acc)}
+.item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+footer{border-top:1px solid var(--line);background:var(--panel)}
+#tlbar{display:flex;gap:6px;align-items:center;padding:6px 10px;flex-wrap:wrap}
+#tlbar .sp{flex:1}
+#tlScroll{overflow-x:auto;padding:0 10px 10px}
+#tl{position:relative;min-width:100%;user-select:none}
+#ruler{height:18px;position:relative;color:var(--muted);font-size:10px;cursor:pointer}
+#ruler i{position:absolute;top:0;height:6px;border-left:1px solid var(--line)}
+#ruler b{position:absolute;top:5px;font-weight:400;transform:translateX(2px)}
+.track{position:relative;height:46px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;margin-top:4px;cursor:pointer}
+.track.small{height:26px}
+.blk{position:absolute;top:3px;bottom:3px;background:var(--clip);border-radius:5px;overflow:hidden;padding:3px 6px;font-size:11px;white-space:nowrap;border:1.5px solid transparent}
+.blk.sel{border-color:#fff;background:var(--clipSel)}
+.blk.t{background:var(--txtClip)}
+.blk small{display:block;opacity:.75}
+#trVO .blk{background:#e8833a;padding:0;cursor:grab;touch-action:none}
+#trVO .blk canvas{position:absolute;inset:0;width:100%;height:100%}
+#trVO .blk span{position:relative;padding:2px 6px;font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.meter{height:6px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;overflow:hidden;margin:8px 0 2px}
+.meter div{height:100%;width:0;background:linear-gradient(90deg,#0f9d76 0%,#0f9d76 70%,#e8a33a 85%,#d6334a 100%);transition:width .05s}
+#voWave{width:100%;height:84px;display:block;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;cursor:pointer}
+label.chk{display:flex;gap:7px;align-items:center;color:var(--text);margin:5px 0}
+label.chk input{width:auto;flex:0 0 auto}
+#countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font:800 96px system-ui;color:#fff;text-shadow:0 4px 20px rgba(0,0,0,.6);pointer-events:none;z-index:4}
+#recDot{position:absolute;top:18px;left:50%;transform:translateX(-50%);display:none;background:#d6334a;color:#fff;font-weight:700;font-size:12px;padding:4px 10px;border-radius:20px;z-index:4}
+#ph{position:absolute;top:0;bottom:0;width:2px;background:var(--warn);pointer-events:none;z-index:5}
+#ph:before{content:"";position:absolute;top:0;left:-5px;border:6px solid transparent;border-top-color:var(--warn)}
+
+#exportBox{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
+#exportBox.show{display:flex}
+#exportBox .card{width:min(420px,92vw);padding:18px}
+.bar{height:8px;background:var(--panel2);border-radius:5px;overflow:hidden;margin:10px 0}
+.bar div{height:100%;width:0;background:var(--acc)}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1c2126;color:#fff;border:1px solid var(--acc);padding:8px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+#toast.show{opacity:1}
+#hiddenMedia{position:fixed;left:-10px;top:-10px;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none}
+
+@media (max-width:980px){
+  #app{height:auto;min-height:100vh}
+  main{grid-template-columns:minmax(0,1fr);padding:8px 16px}
+  #stage{order:-1}
+  #canvasWrap{flex:none;height:auto}
+  #cv{height:min(52vh,520px);max-height:none}
+  .pane{max-height:none}
+  header{flex-wrap:wrap;padding:8px 16px}
+  #info{order:3;flex-basis:100%;text-align:left}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div class="logo">Kurgu<span>Masası</span></div>
+  <div id="info" hidden>0 klip · 0:00 · 1080×1920</div>
+  <button id="btnReset" class="danger" title="Her şeyi temizle">Sıfırla</button>
+  <button id="btnExport" class="primary" disabled>Dışa aktar</button>
+</header>
+
+<main>
+  <!-- SOL PANEL -->
+  <section class="panel">
+    <div class="tabs" data-group="L">
+      <button class="active" data-tab="pMedia">Medya</button>
+      <button data-tab="pAudio">Ses</button>
+      <button data-tab="pRank" hidden>Sıralama</button>
+    </div>
+    <div class="pane active" id="pMedia">
+      <h3>Video yükle</h3>
+      <div id="drop">Video dosyalarını buraya sürükle<br>ya da <b>tıkla ve seç</b></div>
+      <input type="file" id="fileVideo" accept="video/*" multiple hidden>
+      <div class="list" id="clipList"></div>
+      <div class="card" id="clipInsp" style="margin-top:10px;display:none">
+        <h3>Seçili klip</h3>
+        <div class="hint" id="ciName"></div>
+        <div class="row">
+          <div><label>Başlangıç (sn)</label><input type="number" id="ciIn" step="0.1" min="0"></div>
+          <div><label>Bitiş (sn)</label><input type="number" id="ciOut" step="0.1" min="0"></div>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button id="ciInHere" title="Klibin başını oynatma çubuğuna çek">Başı buraya</button>
+          <button id="ciOutHere" title="Klibin sonunu oynatma çubuğuna çek">Sonu buraya</button>
+        </div>
+        <label>Klip sesi <span id="ciVolV">100%</span></label>
+        <div class="row"><input type="range" id="ciVol" min="0" max="200" value="100"><button class="auto" id="ciMute">Sessiz</button></div>
+        <div hidden><label>Sıralama etiketi</label>
+        <input type="text" id="ciLabel" placeholder="ör. En hızlı araba"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pAudio">
+      <h3>Genel ses</h3>
+      <label>Ana ses seviyesi <span id="masterV">100%</span></label>
+      <input type="range" id="master" min="0" max="200" value="100">
+
+      <div class="card" style="margin-top:12px">
+        <h3>Seslendirme</h3>
+        <div class="row">
+          <button id="voRec" class="primary">● Kaydet</button>
+          <button id="voUpload">Dosya yükle</button>
+        </div>
+        <input type="file" id="fileAudio" accept="audio/*,video/webm" hidden>
+        <div class="meter" title="Mikrofon seviyesi"><div id="voMeter"></div></div>
+        <label class="row" style="color:var(--text)"><input type="checkbox" id="voRecPlay" checked style="flex:0 0 auto;width:auto"> Kayıtta videoyu oynat (oynatma çubuğundan başlar)</label>
+        <p class="hint">3 sn geri sayımdan sonra kayıt başlar. Video sesi mikrofona girmesin diye kulaklık kullan.</p>
+        <div class="hint" id="voInfo">Seslendirme yok.</div>
+
+        <div id="voEdit" style="display:none">
+          <canvas id="voWave" width="560" height="110" title="Tıkla: o ana git"></canvas>
+          <div class="row">
+            <div><label>Kırp: baş (sn)</label><input type="number" id="voIn" step="0.05" min="0"></div>
+            <div><label>Kırp: son (sn)</label><input type="number" id="voOut" step="0.05" min="0"></div>
+          </div>
+          <div class="row" style="align-items:flex-end">
+            <div><label>Videoda başlama (sn)</label><input type="number" id="voOff" step="0.05" min="0"></div>
+            <button id="voOffHere" title="Seslendirmeyi oynatma çubuğunun olduğu yerden başlat">Şu ana al</button>
+          </div>
+          <p class="hint">Zaman çizelgesindeki turuncu şeridi sürükleyerek de kaydırabilirsin.</p>
+          <div class="row">
+            <div><label>Açılış <span id="voFadeInV">0.0 sn</span></label><input type="range" id="voFadeIn" min="0" max="30" value="0"></div>
+            <div><label>Kapanış <span id="voFadeOutV">0.0 sn</span></label><input type="range" id="voFadeOut" min="0" max="30" value="0"></div>
+          </div>
+          <label>Seslendirme seviyesi <span id="voVolV">100%</span></label>
+          <input type="range" id="voVol" min="0" max="200" value="100">
+
+          <h3 style="margin-top:12px">Ses iyileştirme</h3>
+          <label class="chk"><input type="checkbox" id="fxClean" checked> Uğultu ve tıslamayı temizle</label>
+          <label class="chk"><input type="checkbox" id="fxGate" checked> Arka plan gürültüsünü bastır</label>
+          <label class="chk"><input type="checkbox" id="fxVoice" checked> Sesi netleştir (EQ)</label>
+          <label class="chk"><input type="checkbox" id="fxComp" checked> Sesi dengele (kompresör)</label>
+          <label class="chk"><input type="checkbox" id="fxNorm" checked> Seviyeyi yükselt (normalize)</label>
+          <div class="row" style="margin-top:6px">
+            <button id="fxAB" title="İyileştirmeleri geçici kapatıp orijinali dinle">Orijinali dinle</button>
+            <button id="voRemove" class="danger">Kaldır</button>
+          </div>
+          <div class="hint" id="fxState"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Video sesi</h3>
+        <label class="chk"><input type="checkbox" id="duckOn" checked> Konuşurken video sesini kıs</label>
+        <label>Kısılınca seviye <span id="duckLvlV">25%</span></label>
+        <input type="range" id="duckLvl" min="0" max="100" value="25">
+        <p class="hint">Klip sesleri Medya sekmesinde, seçili klip için ayrı ayarlanır.</p>
+      </div>
+    </div>
+
+    <div class="pane" id="pRank">
+      <h3>Sıralama rozeti</h3>
+      <p class="hint">“İlk 5” tarzı videolar için her klibe numara basar.</p>
+      <button id="rankOn">Kapalı</button>
+      <label>Yön</label>
+      <select id="rankDir"><option value="down">Geri sayım (5…1)</option><option value="up">İleri sayım (1…5)</option></select>
+      <label>Konum</label>
+      <select id="rankPos"><option value="tl">Sol üst</option><option value="tr">Sağ üst</option><option value="bl">Sol alt</option></select>
+      <div class="row"><div><label>Rozet rengi</label><input type="color" id="rankColor" value="#2ee6a6"></div><div><label>Yazı rengi</label><input type="color" id="rankText" value="#04140e"></div></div>
+      <p class="hint">Etiketleri Medya → Seçili klip kısmından yaz.</p>
+    </div>
+  </section>
+
+  <!-- ORTA -->
+  <section class="panel" id="stage">
+    <div id="canvasWrap">
+      <canvas id="cv" width="1080" height="1920"></canvas>
+      <div id="countdown"></div><div id="recDot">● KAYIT</div>
+      <div id="empty">Video yükle, zaman çizelgesine eklensin.<br>Sonra yazı, filtre ve ses ekle.</div>
+    </div>
+    <div id="transport">
+      <button id="tStart" title="Başa dön">⏮</button>
+      <button id="tBack" title="1 sn geri">−1s</button>
+      <button id="tPlay" class="primary" title="Oynat / duraklat (Boşluk)">▶ Oynat</button>
+      <button id="tFwd" title="1 sn ileri">+1s</button>
+      <button id="tEnd" title="Sona git">⏭</button>
+      <span class="mono" id="tTime">0:00.00 / 0:00.00</span>
+      <input type="range" id="seek" min="0" max="1000" value="0">
+      <button id="tSnap" title="Bu kareyi PNG indir">Kare PNG</button>
+    </div>
+  </section>
+
+  <!-- SAĞ PANEL -->
+  <section class="panel">
+    <div class="tabs" data-group="R">
+      <button class="active" data-tab="pText">Yazı</button>
+      <button data-tab="pLook">Görüntü</button>
+    </div>
+    <div class="pane active" id="pText">
+      <div class="row"><button id="txAdd" class="primary">+ Yazı ekle</button><button id="txHook">Hızlı başlık</button></div>
+      <div class="list" id="textList"></div>
+      <div class="card" id="txInsp" style="margin-top:10px;display:none">
+        <label>Metin</label>
+        <textarea id="txText"></textarea>
+        <div class="row" style="margin-top:6px;align-items:center">
+          <button id="txHlBtn" title="Metinde seçtiğin kelimeleri vurgu rengine boya">Seçili kelimeyi renklendir</button>
+          <input type="color" id="txHl" title="Vurgu rengi" style="flex:0 0 auto">
+        </div>
+        <p class="hint">Kelimeyi seç, butona bas. Ya da <b>*kelime*</b> diye yıldız içine yaz.</p>
+        <div class="row">
+          <div><label>Font</label>
+            <select id="txFont">
+              <option value="Impact">Impact</option>
+              <option value="Anton">Anton</option>
+              <option value="Bebas Neue">Bebas Neue</option>
+              <option value="Montserrat">Montserrat</option>
+              <option value="Poppins">Poppins</option>
+              <option value="Arial">Arial</option>
+              <option value="Georgia">Georgia</option>
+            </select></div>
+          <div><label>Boyut <span id="txSizeV"></span></label><input type="range" id="txSize" min="30" max="220"></div>
+        </div>
+        <div class="row">
+          <div><label>Yazı rengi</label><input type="color" id="txColor"></div>
+          <div><label>Kenarlık</label><input type="color" id="txStroke"></div>
+          <div><label>Kalınlık</label><input type="number" id="txStrokeW" min="0" max="30"></div>
+        </div>
+        <label>Konum <span class="hint" style="margin:0">(önizlemede yazıyı sürükleyerek de taşıyabilirsin)</span></label>
+        <div class="row" id="txPosBtns">
+          <button data-pos="0.12">Üst</button><button data-pos="0.5">Orta</button><button data-pos="0.85">Alt</button>
+        </div>
+        <label>Dikey konum <span id="txYV"></span></label>
+        <input type="range" id="txY" min="3" max="97">
+        <label class="row" style="color:var(--text)"><input type="checkbox" id="txBox" style="flex:0 0 auto;width:auto"> Arkasına koyu kutu</label>
+        <div class="row">
+          <div><label>Başlangıç (sn)</label><input type="number" id="txStart" step="0.1" min="0"></div>
+          <div><label>Bitiş (sn, boş=sona kadar)</label><input type="number" id="txEnd" step="0.1" min="0"></div>
+        </div>
+        <div class="row" style="margin-top:6px" hidden>
+          <button id="txStartHere">Baş = şimdi</button><button id="txEndHere">Bitiş = şimdi</button>
+        </div>
+        <button id="txDel" class="danger" style="margin-top:8px;width:100%">Yazıyı sil</button>
+      </div>
+    </div>
+
+    <div class="pane" id="pLook">
+      <h3>Tuval</h3>
+      <label>Boyut</label>
+      <div class="row" id="fmtBtns" style="flex-wrap:wrap">
+        <button data-fmt="9:16" class="on">9:16 Reels</button><button data-fmt="4:5">4:5</button><button data-fmt="1:1">1:1</button><button data-fmt="16:9" hidden>16:9</button>
+      </div>
+      <label hidden>Klip yerleşimi</label>
+      <div class="row" id="fitBtns" hidden><button data-fit="fill" class="on">Doldur (kırp)</button><button data-fit="fit">Sığdır</button></div>
+      <div hidden><label>Arka plan rengi</label>
+      <input type="color" id="bgColor" value="#000000"></div>
+      <label>Yakınlaştırma <span id="zoomV">100%</span></label>
+      <input type="range" id="zoom" min="100" max="200" value="100">
+      <h3 style="margin-top:14px">Renk</h3>
+      <label>Parlaklık <span id="brightV">100%</span></label>
+      <input type="range" id="bright" min="30" max="200" value="100">
+      <label>Kontrast <span id="contrastV">100%</span></label>
+      <input type="range" id="contrast" min="30" max="200" value="100">
+      <label>Doygunluk <span id="satV">100%</span></label>
+      <input type="range" id="sat" min="0" max="200" value="100">
+      <button id="lookReset" style="margin-top:10px;width:100%">Renkleri sıfırla</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div id="tlbar">
+    <b style="margin-right:6px">Zaman çizelgesi</b>
+    <button id="bSplit" title="Oynatma çubuğundan böl (S)">✂ Böl</button>
+    <button id="bDel" title="Seçili klibi sil (Delete)">Sil</button>
+    <button id="bLeft" title="Seçili klibi sola taşı">◀ Sola</button>
+    <button id="bRight" title="Seçili klibi sağa taşı">Sağa ▶</button>
+    <button id="bDup" title="Seçili klibi çoğalt" hidden>Çoğalt</button>
+    <span class="sp"></span>
+    <span class="hint" id="tlInfo">0 klip</span>
+    <label style="margin:0 0 0 8px" hidden>Yakınlık</label>
+    <input type="range" id="tlZoom" min="10" max="200" value="60" style="width:110px" hidden>
+  </div>
+  <div id="tlScroll">
+    <div id="tl">
+      <div id="ruler"></div>
+      <div class="track" id="trClips"></div>
+      <div class="track small" id="trTexts"></div>
+      <div class="track small" id="trVO"></div>
+      <div id="ph"></div>
+    </div>
+  </div>
+</footer>
+</div>
+
+<div id="exportBox">
+  <div class="card">
+    <h3>Dışa aktarma</h3>
+    <div id="exMsg">Video gerçek zamanlı kaydediliyor. Bu sekmeyi açık tut.</div>
+    <div class="bar"><div id="exBar"></div></div>
+    <div class="row">
+      <a id="exDl" style="display:none"><button class="primary" style="width:100%">İndir</button></a>
+      <button id="exCancel">İptal</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="hiddenMedia"></div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const FORMATS = {'9:16':[1080,1920],'4:5':[1080,1350],'1:1':[1080,1080],'16:9':[1920,1080]};
+
+const S = {
+  clips: [], texts: [], vo: null,
+  fmt:'9:16', fit:'fill', bg:'#000000', zoom:1, bright:100, contrast:100, sat:100, master:1, voVol:1,
+  duck:{on:true, lvl:0.25},
+  rank:{on:false, dir:'down', pos:'tl', color:'#2ee6a6', text:'#04140e'},
+  sel:null, selText:null, t:0, playing:false, cur:0, exporting:null, pps:60
+};
+let uid = 1;
+
+// ---------- yardımcılar ----------
+const fmtT = s => { s = Math.max(0, s||0); const m = Math.floor(s/60); const r = s - m*60; return m + ':' + r.toFixed(2).padStart(5,'0'); };
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const toast = msg => { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 1800); };
+const len = c => Math.max(0, c.out - c.in);
+const total = () => S.clips.reduce((a,c)=>a+len(c), 0);
+const offsets = () => { let o = 0; return S.clips.map(c => { const r = o; o += len(c); return r; }); };
+function locate(t){
+  const off = offsets();
+  for (let i=0;i<S.clips.length;i++){ if (t < off[i] + len(S.clips[i]) - 1e-4) return {i, local: t - off[i]}; }
+  const i = S.clips.length-1; return {i, local: i>=0 ? len(S.clips[i]) : 0};
+}
+const selClip = () => S.clips.find(c => c.id === S.sel);
+const selTxt = () => S.texts.find(x => x.id === S.selText);
+
+// ---------- ses grafiği ----------
+let AC = null, masterGain, recDest, voGain;
+function ensureAudio(){
+  if (!AC){
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = AC.createGain(); masterGain.gain.value = S.master;
+    recDest = AC.createMediaStreamDestination();
+    masterGain.connect(AC.destination); masterGain.connect(recDest);
+    voGain = AC.createGain(); voGain.gain.value = S.voVol; voGain.connect(masterGain);
+  }
+  for (const c of S.clips) wireEl(c.el);
+  if (S.vo && !S.vo.el._src){ S.vo.el._src = AC.createMediaElementSource(S.vo.el); S.vo.el._src.connect(voGain); }
+  if (AC.state === 'suspended') AC.resume();
+}
+function wireEl(el){
+  if (!AC || el._src) return;
+  el._src = AC.createMediaElementSource(el);
+  el._gain = AC.createGain(); el._src.connect(el._gain); el._gain.connect(masterGain);
+}
+function clipTarget(c){ return c.muted ? 0 : c.vol * (S.duck.on && voSpeaking() ? S.duck.lvl : 1); }
+function applyClipGain(c){ if (c && c.el._gain) c.el._gain.gain.value = clipTarget(c); }
+
+// ---------- medya yükleme ----------
+function loadMeta(el){
+  return new Promise((res, rej) => {
+    el.addEventListener('loadedmetadata', async () => {
+      if (!isFinite(el.duration)) { // MediaRecorder webm: süre bilinmiyor
+        await new Promise(r => { el.addEventListener('durationchange', function f(){ if (isFinite(el.duration)){ el.removeEventListener('durationchange', f); r(); } }); el.currentTime = 1e9; });
+        el.currentTime = 0;
+      }
+      res(el.duration);
+    }, {once:true});
+    el.addEventListener('error', () => rej(new Error('Dosya okunamadı')), {once:true});
+  });
+}
+async function addVideoFiles(files){
+  let n = 0;
+  for (const f of files){
+    if (!f.type.startsWith('video/') && !/\.(mp4|mov|webm|m4v|mkv)$/i.test(f.name)) { toast(f.name + ' video değil'); continue; }
+    const el = document.createElement('video');
+    el.src = URL.createObjectURL(f); el.preload = 'auto'; el.playsInline = true; el.crossOrigin = 'anonymous';
+    $('hiddenMedia').appendChild(el);
+    try {
+      const d = await loadMeta(el);
+      el.addEventListener('seeked', draw);
+      el.addEventListener('loadeddata', draw);
+      wireEl(el);
+      const c = {id: uid++, name: f.name, el, dur: d, in: 0, out: d, vol: 1, muted: false, label: ''};
+      S.clips.push(c); S.sel = c.id; n++;
+    } catch(e){ toast(f.name + ': ' + e.message); el.remove(); }
+  }
+  if (n){ toast(n + ' klip eklendi'); seek(S.t); }
+  refresh();
+}
+$('drop').onclick = () => $('fileVideo').click();
+$('fileVideo').onchange = e => { addVideoFiles([...e.target.files]); e.target.value = ''; };
+['dragover','dragenter'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('over'); }));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('over'); }));
+$('drop').addEventListener('drop', e => addVideoFiles([...e.dataTransfer.files]));
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); if (e.target.closest('#drop')) return; const fs=[...e.dataTransfer.files]; if (fs.length) addVideoFiles(fs); });
+
+// ---------- oynatma ----------
+function pauseAll(){ for (const c of S.clips) if (!c.el.paused) c.el.pause(); if (S.vo && !S.vo.el.paused) S.vo.el.pause(); }
+function startClip(i, local){
+  S.cur = i; const c = S.clips[i];
+  for (const o of S.clips) if (o.el !== c.el && !o.el.paused) o.el.pause();
+  applyClipGain(c);
+  c.el.currentTime = c.in + local;
+  const p = c.el.play(); if (p) p.catch(err => { toast('Oynatılamadı: ' + err.message); stop(); });
+}
+function voLocal(){ return S.vo ? S.t - S.vo.offset : -1; }
+function voSpeaking(){
+  const v = S.vo; if (!v || !v.peaks || v.dur <= 0) return false;
+  const l = voLocal(); if (l < -0.15 || l > v.dur + 0.3) return false;
+  const n = v.peaks.length, a = Math.max(0, Math.floor((l - 0.15)/v.dur*n)), b = Math.min(n-1, Math.ceil((l + 0.35)/v.dur*n));
+  for (let i = a; i <= b; i++) if (v.peaks[i] > 0.12) return true;
+  return false;
+}
+function syncVO(){
+  if (!S.vo || recording) return;
+  const l = voLocal();
+  if (S.playing && l >= 0 && l < S.vo.dur){ S.vo.el.currentTime = l; S.vo.el.play().catch(()=>{}); }
+  else S.vo.el.pause();
+}
+function voTick(){
+  if (!S.vo || recording) return;
+  const l = voLocal(), el = S.vo.el, inside = S.playing && l >= 0 && l < S.vo.dur;
+  if (inside && el.paused){ el.currentTime = l; el.play().catch(()=>{}); }
+  else if (!inside && !el.paused) el.pause();
+  else if (inside && Math.abs(el.currentTime - l) > 0.2) el.currentTime = l;
+}
+function play(){
+  if (!S.clips.length) return toast('Önce video yükle');
+  ensureAudio();
+  if (S.t >= total() - 0.05) S.t = 0;
+  S.playing = true;
+  const {i, local} = locate(S.t);
+  startClip(i, local); syncVO(); updTransport();
+}
+function stop(){ S.playing = false; pauseAll(); updTransport(); }
+function toggle(){ S.playing ? stop() : play(); }
+function seek(t){
+  const T = total(); S.t = clamp(t, 0, T);
+  if (!S.clips.length){ draw(); updTime(); return; }
+  const {i, local} = locate(S.t);
+  if (S.playing){ startClip(i, local); syncVO(); }
+  else { S.cur = i; const c = S.clips[i]; c.el.currentTime = clamp(c.in + local, 0, c.dur - 0.001); }
+  draw(); updTime();
+}
+function tick(){
+  if (S.playing && S.clips.length){
+    const off = offsets(); let c = S.clips[S.cur];
+    if (!c){ stop(); }
+    else {
+      S.t = off[S.cur] + (c.el.currentTime - c.in);
+      if (c.el.currentTime >= c.out - 0.03 || c.el.ended){
+        if (S.cur < S.clips.length - 1){ startClip(S.cur + 1, 0); S.t = off[S.cur]; }
+        else { S.t = total(); stop(); if (S.exporting) finishExport(); }
+      }
+    }
+    voTick();
+    const cc = S.clips[S.cur];
+    if (cc && cc.el._gain && AC) cc.el._gain.gain.setTargetAtTime(clipTarget(cc), AC.currentTime, 0.12);
+    if (S.exporting) $('exBar').style.width = (100 * S.t / Math.max(0.01,total())) + '%';
+    updTime();
+  }
+  draw();
+  requestAnimationFrame(tick);
+}
+
+// ---------- çizim ----------
+window.addEventListener('resize', () => draw());
+// ---------- yazıyı önizlemede sürükle ----------
+function canvasPt(e){
+  const r = cv.getBoundingClientRect(), [W,H] = FORMATS[S.fmt];
+  return {x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H, W, H};
+}
+function textAt(p){
+  for (let i = S.texts.length - 1; i >= 0; i--){
+    const x = S.texts[i], b = x._bb, end = x.end == null ? Infinity : x.end;
+    if (!b || S.t < x.start || S.t >= end) continue;
+    if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return x;
+  }
+  return null;
+}
+let drag = null;
+cv.addEventListener('pointerdown', e => {
+  if (S.exporting) return;
+  const p = canvasPt(e), x = textAt(p); if (!x) return;
+  e.preventDefault(); cv.setPointerCapture(e.pointerId);
+  drag = {x, dx: p.x - p.W*(x.x == null ? 0.5 : x.x), dy: p.y - p.H*x.y};
+  if (S.selText !== x.id){ S.selText = x.id; switchTab('R','pText'); refresh(); }
+  cv.style.cursor = 'grabbing';
+});
+cv.addEventListener('pointermove', e => {
+  const p = canvasPt(e);
+  if (!drag){ cv.style.cursor = textAt(p) ? 'grab' : ''; return; }
+  const x = drag.x;
+  x.x = clamp((p.x - drag.dx) / p.W, 0.02, 0.98);
+  x.y = clamp((p.y - drag.dy) / p.H, 0.02, 0.98);
+  // ortaya yakınsa yapıştır
+  if (Math.abs(x.x - 0.5) < 0.015) x.x = 0.5;
+  $('txY').value = Math.round(x.y*100); $('txYV').textContent = Math.round(x.y*100) + '%';
+  draw();
+});
+const endDrag = () => { if (drag){ drag = null; cv.style.cursor = 'grab'; refresh(); } };
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+function draw(){
+  const [W,H] = FORMATS[S.fmt];
+  // Önizleme: ekranda görünen piksel kadar çiz (küçültme bozulması olmasın). Dışa aktarma / PNG: tam çözünürlük.
+  let k = 1;
+  if (!S.exporting && !S.fullRes){
+    const dispH = cv.clientHeight || H;
+    k = Math.min(1, (dispH * (window.devicePixelRatio || 1)) / H);
+  }
+  const pw = Math.round(W*k), ph = Math.round(H*k);
+  if (cv.width !== pw || cv.height !== ph){ cv.width = pw; cv.height = ph; }
+  ctx.setTransform(pw/W, 0, 0, ph/H, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.filter = 'none';
+  ctx.fillStyle = S.bg; ctx.fillRect(0,0,W,H);
+  const c = S.clips[S.cur];
+  if (c && c.el.readyState >= 2){
+    const vw = c.el.videoWidth, vh = c.el.videoHeight;
+    let sc = S.fit === 'fill' ? Math.max(W/vw, H/vh) : Math.min(W/vw, H/vh);
+    sc *= S.zoom;
+    const dw = vw*sc, dh = vh*sc;
+    ctx.filter = `brightness(${S.bright}%) contrast(${S.contrast}%) saturate(${S.sat}%)`;
+    ctx.drawImage(c.el, (W-dw)/2, (H-dh)/2, dw, dh);
+    ctx.filter = 'none';
+  }
+  if (S.rank.on && c) drawRank(c, W, H);
+  for (const x of S.texts){
+    const end = x.end == null ? Infinity : x.end;
+    if (S.t >= x.start && (S.t < end || (end === Infinity))) drawText(x, W, H);
+  }
+  $('empty').style.display = S.clips.length ? 'none' : 'flex';
+}
+function drawRank(c, W, H){
+  const n = S.clips.length, idx = S.cur;
+  const num = S.rank.dir === 'down' ? n - idx : idx + 1;
+  const r = W * 0.075, m = W * 0.05;
+  const cx = S.rank.pos === 'tr' ? W - m - r : m + r;
+  const cy = S.rank.pos === 'bl' ? H - m - r - H*0.06 : m + r + H*0.17;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fillStyle = S.rank.color; ctx.fill();
+  ctx.fillStyle = S.rank.text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `${Math.round(r*1.1)}px Anton, Impact, sans-serif`;
+  ctx.fillText('#' + num, cx, cy + r*0.04);
+  if (c.label){
+    ctx.font = `${Math.round(W*0.045)}px Montserrat, Arial, sans-serif`; ctx.font = `800 ${Math.round(W*0.045)}px Montserrat, Arial, sans-serif`;
+    const right = S.rank.pos === 'tr';
+    ctx.textAlign = right ? 'right' : 'left';
+    const lx = right ? cx - r - W*0.025 : cx + r + W*0.025;
+    ctx.lineWidth = W*0.012; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round';
+    ctx.strokeText(c.label, lx, cy); ctx.fillStyle = '#fff'; ctx.fillText(c.label, lx, cy);
+  }
+}
+// Metni kelimelere böl; *yıldız* arası vurgu rengi (birden çok kelimeyi kapsayabilir)
+function tokens(text){
+  const paras = []; let hl = false;
+  for (const para of String(text).split('\n')){
+    const words = [];
+    for (const raw of para.split(/\s+/)){
+      if (!raw) continue;
+      const pieces = []; let buf = '';
+      for (const ch of raw){
+        if (ch === '*'){ if (buf) pieces.push({t:buf, hl}); buf = ''; hl = !hl; }
+        else buf += ch;
+      }
+      if (buf) pieces.push({t:buf, hl});
+      if (pieces.length) words.push(pieces);
+    }
+    paras.push(words);
+  }
+  return paras;
+}
+const wordW = w => w.reduce((a,p) => a + ctx.measureText(p.t).width, 0);
+function layout(text, maxW){
+  const sp = ctx.measureText(' ').width, out = [];
+  for (const words of tokens(text)){
+    let line = [], lw = 0;
+    for (const w of words){
+      const ww = wordW(w), nw = line.length ? lw + sp + ww : ww;
+      if (nw > maxW && line.length){ out.push({words:line, w:lw}); line = [w]; lw = ww; }
+      else { line.push(w); lw = nw; }
+    }
+    out.push({words:line, w:lw});
+  }
+  return {lines: out, sp};
+}
+function drawText(x, W, H){
+  const weight = (x.font === 'Montserrat') ? '800 ' : (x.font === 'Poppins' ? '700 ' : '');
+  ctx.font = `${weight}${x.size}px "${x.font}", Impact, sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const {lines, sp} = layout(x.text, W*0.88), lh = x.size * 1.12;
+  const y0 = H * x.y - (lines.length-1) * lh / 2;
+  const CX = W * (x.x == null ? 0.5 : x.x);
+  const mw = Math.max(0, ...lines.map(l => l.w)), pad = x.size*0.3;
+  x._bb = {x: CX - mw/2 - pad, y: y0 - lh/2 - pad*0.5, w: mw + pad*2, h: lh*lines.length + pad};
+  if (x.box){
+    ctx.fillStyle = 'rgba(0,0,0,.6)';
+    ctx.fillRect(x._bb.x, x._bb.y, x._bb.w, x._bb.h);
+  }
+  ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+  // önce tüm kenarlıklar, sonra dolgu: harfler birbirinin kenarlığını örtmesin
+  if (!S.exporting && !S.fullRes && x.id === S.selText){
+    ctx.save(); ctx.setLineDash([W*0.012, W*0.008]); ctx.lineWidth = W*0.003; ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.strokeRect(x._bb.x, x._bb.y, x._bb.w, x._bb.h); ctx.restore();
+  }
+  for (const pass of ['stroke','fill']){
+    if (pass === 'stroke' && !(x.strokeW > 0)) continue;
+    lines.forEach((l, k) => {
+      const y = y0 + k*lh; let cx = CX - l.w/2;
+      l.words.forEach((w, wi) => {
+        if (wi) cx += sp;
+        for (const p of w){
+          if (pass === 'stroke'){ ctx.lineWidth = x.strokeW*2; ctx.strokeStyle = x.stroke; ctx.strokeText(p.t, cx, y); }
+          else { ctx.fillStyle = p.hl ? (x.hl || '#ffd400') : x.color; ctx.fillText(p.t, cx, y); }
+          cx += ctx.measureText(p.t).width;
+        }
+      });
+    });
+  }
+}
+
+// ---------- arayüz yenileme ----------
+function updTime(){
+  if (S.vo && $('pAudio').classList.contains('active')) drawVoWave();
+  const T = total();
+  $('tTime').textContent = fmtT(S.t) + ' / ' + fmtT(T);
+  if (document.activeElement !== $('seek')) $('seek').value = T ? Math.round(1000*S.t/T) : 0;
+  $('ph').style.left = (S.t * S.pps) + 'px';
+}
+function updTransport(){
+  $('tPlay').textContent = S.playing ? '❚❚ Duraklat' : '▶ Oynat';
+}
+function refresh(){
+  const T = total(), [W,H] = FORMATS[S.fmt];
+  $('info').textContent = `${S.clips.length} klip · ${fmtT(T)} · ${W}×${H}`;
+  cv.style.setProperty('--ar', W + '/' + H);
+  $('tlInfo').textContent = `${S.clips.length} klip · ${S.texts.length} yazı`;
+  $('btnExport').disabled = !S.clips.length;
+  // klip listesi
+  const off = offsets();
+  $('clipList').innerHTML = '';
+  S.clips.forEach((c, i) => {
+    const d = document.createElement('div'); d.className = 'item' + (c.id === S.sel ? ' sel' : '');
+    d.innerHTML = `<span class="mono">${i+1}</span><span class="nm"></span><span class="mono">${len(c).toFixed(1)}s</span>`;
+    d.querySelector('.nm').textContent = c.name;
+    d.onclick = () => { S.sel = c.id; seek(off[i] + 0.001); refresh(); };
+    $('clipList').appendChild(d);
+  });
+  // klip denetçisi
+  const c = selClip();
+  $('clipInsp').style.display = c ? 'block' : 'none';
+  if (c){
+    $('ciName').textContent = `${c.name} · kaynak ${c.dur.toFixed(2)} sn`;
+    if (document.activeElement !== $('ciIn')) $('ciIn').value = c.in.toFixed(2);
+    if (document.activeElement !== $('ciOut')) $('ciOut').value = c.out.toFixed(2);
+    $('ciIn').max = $('ciOut').max = c.dur.toFixed(2);
+    $('ciVol').value = Math.round(c.vol*100); $('ciVolV').textContent = Math.round(c.vol*100) + '%';
+    $('ciMute').classList.toggle('on', c.muted); $('ciMute').textContent = c.muted ? 'Sessiz ✓' : 'Sessiz';
+    if (document.activeElement !== $('ciLabel')) $('ciLabel').value = c.label;
+  }
+  ['bDel','bLeft','bRight','bDup'].forEach(b => $(b).disabled = !c); $('bSplit').disabled = !S.clips.length;
+  // yazı listesi
+  $('textList').innerHTML = '';
+  S.texts.forEach(x => {
+    const d = document.createElement('div'); d.className = 'item' + (x.id === S.selText ? ' sel' : '');
+    d.innerHTML = `<span class="nm"></span><span class="mono">${x.start.toFixed(1)}–${x.end==null?'son':x.end.toFixed(1)}</span>`;
+    d.querySelector('.nm').textContent = x.text.replace(/\n/g,' ').replace(/\*/g,'') || '(boş)';
+    d.onclick = () => { S.selText = x.id; refresh(); };
+    $('textList').appendChild(d);
+  });
+  const x = selTxt();
+  $('txInsp').style.display = x ? 'block' : 'none';
+  if (x){
+    if (document.activeElement !== $('txText')) $('txText').value = x.text;
+    $('txFont').value = x.font; $('txSize').value = x.size; $('txSizeV').textContent = x.size + 'px';
+    $('txColor').value = x.color; $('txHl').value = x.hl || '#ffd400'; $('txStroke').value = x.stroke; $('txStrokeW').value = x.strokeW;
+    $('txY').value = Math.round(x.y*100); $('txYV').textContent = Math.round(x.y*100) + '%';
+    $('txBox').checked = x.box;
+    if (document.activeElement !== $('txStart')) $('txStart').value = x.start.toFixed(2);
+    if (document.activeElement !== $('txEnd')) $('txEnd').value = x.end == null ? '' : x.end.toFixed(2);
+  }
+  // ses
+  refreshVO();
+  // sıralama
+  $('rankOn').textContent = S.rank.on ? 'Açık' : 'Kapalı'; $('rankOn').classList.toggle('on', S.rank.on);
+  drawTimeline(); updTime(); draw();
+}
+function drawTimeline(){
+  const T = Math.max(total(), S.vo ? S.vo.offset + S.vo.dur : 0, 5);
+  const wpx = T * S.pps + 40;
+  $('tl').style.width = wpx + 'px';
+  // cetvel
+  const step = S.pps >= 80 ? 1 : S.pps >= 30 ? 2 : S.pps >= 15 ? 5 : 10;
+  let h = '';
+  for (let s = 0; s <= T; s += step) h += `<i style="left:${s*S.pps}px"></i><b style="left:${s*S.pps}px">${fmtT(s).replace(/\.\d+$/,'')}</b>`;
+  $('ruler').innerHTML = h;
+  // klipler
+  const off = offsets();
+  $('trClips').innerHTML = '';
+  S.clips.forEach((c, i) => {
+    const b = document.createElement('div'); b.className = 'blk' + (c.id === S.sel ? ' sel' : '');
+    b.style.left = (off[i]*S.pps) + 'px'; b.style.width = Math.max(4, len(c)*S.pps - 2) + 'px';
+    b.innerHTML = `<span></span><small>${len(c).toFixed(1)}s${c.muted?' · sessiz':''}</small>`;
+    b.querySelector('span').textContent = (i+1) + '. ' + c.name;
+    b.dataset.id = c.id;
+    $('trClips').appendChild(b);
+  });
+  $('trTexts').innerHTML = '';
+  S.texts.forEach(x => {
+    const b = document.createElement('div'); b.className = 'blk t' + (x.id === S.selText ? ' sel' : '');
+    const e = x.end == null ? total() : x.end;
+    b.style.left = (x.start*S.pps) + 'px'; b.style.width = Math.max(6, (e - x.start)*S.pps - 2) + 'px';
+    b.textContent = x.text.replace(/\n/g,' '); b.dataset.tid = x.id;
+    $('trTexts').appendChild(b);
+  });
+  // seslendirme şeridi
+  $('trVO').innerHTML = '';
+  if (S.vo){
+    const b = document.createElement('div'); b.className = 'blk';
+    b.style.left = (S.vo.offset*S.pps) + 'px'; b.style.width = Math.max(6, S.vo.dur*S.pps - 2) + 'px';
+    const c = document.createElement('canvas'); c.width = Math.max(6, Math.round(S.vo.dur*S.pps)); c.height = 40;
+    drawPeaks(c, S.vo.peaks, 0, 1, 'rgba(255,255,255,.85)');
+    const sp = document.createElement('span'); sp.textContent = '🎙 ' + S.vo.name;
+    b.append(c, sp); $('trVO').appendChild(b);
+  }
+}
+function drawPeaks(c, peaks, from, to, color){
+  const g = c.getContext('2d'), W = c.width, H = c.height; g.clearRect(0,0,W,H);
+  if (!peaks || !peaks.length) return;
+  g.fillStyle = color; const n = peaks.length;
+  for (let x = 0; x < W; x++){
+    const i0 = Math.floor((from + (to-from)*x/W)*n), i1 = Math.max(i0+1, Math.floor((from + (to-from)*(x+1)/W)*n));
+    let m = 0; for (let i = i0; i < i1 && i < n; i++) if (peaks[i] > m) m = peaks[i];
+    const h = Math.max(1, m * H * 0.9); g.fillRect(x, (H-h)/2, 1, h);
+  }
+}
+function timeFromEvent(e){ const r = $('tl').getBoundingClientRect(); return (e.clientX - r.left) / S.pps; }
+$('trClips').addEventListener('click', e => {
+  const b = e.target.closest('.blk'); if (b) S.sel = +b.dataset.id;
+  seek(timeFromEvent(e)); refresh();
+});
+$('trTexts').addEventListener('click', e => {
+  const b = e.target.closest('.blk'); if (b){ S.selText = +b.dataset.tid; switchTab('R','pText'); }
+  seek(timeFromEvent(e)); refresh();
+});
+$('ruler').addEventListener('click', e => seek(timeFromEvent(e)));
+$('tlZoom').oninput = e => { S.pps = +e.target.value; drawTimeline(); updTime(); };
+
+// ---------- sekmeler ----------
+function switchTab(group, id){
+  const tabs = document.querySelector(`.tabs[data-group="${group}"]`);
+  tabs.querySelectorAll('button').forEach(b => { const on = b.dataset.tab === id; b.classList.toggle('active', on); $(b.dataset.tab).classList.toggle('active', on); });
+}
+document.querySelectorAll('.tabs').forEach(t => t.addEventListener('click', e => { const b = e.target.closest('button'); if (b) switchTab(t.dataset.group, b.dataset.tab); }));
+
+// ---------- transport ----------
+$('tPlay').onclick = toggle;
+$('tStart').onclick = () => seek(0);
+$('tEnd').onclick = () => seek(total());
+$('tBack').onclick = () => seek(S.t - 1);
+$('tFwd').onclick = () => seek(S.t + 1);
+$('seek').oninput = e => seek(total() * e.target.value / 1000);
+$('tSnap').onclick = () => {
+  if (!S.clips.length) return toast('Önce video yükle');
+  S.fullRes = true; draw();
+  cv.toBlob(b => { S.fullRes = false; draw(); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `kare-${fmtT(S.t).replace(/[:.]/g,'-')}.png`; document.body.appendChild(a); a.click(); a.remove(); toast('PNG indirildi'); }, 'image/png');
+};
+
+// ---------- klip işlemleri ----------
+function withSel(fn){ const c = selClip(); if (!c) return toast('Önce klip seç'); fn(c, S.clips.indexOf(c)); refresh(); }
+$('bSplit').onclick = () => {
+  if (!S.clips.length) return toast('Önce video yükle');
+  const {i, local} = locate(S.t); const c = S.clips[i]; S.sel = c.id;
+  if (local <= 0.1 || local >= len(c) - 0.1){ refresh(); return toast('Klibin ucuna çok yakın'); }
+  const cut = c.in + local;
+  const n = {...c, id: uid++, in: cut, label: ''}; c.out = cut;
+  S.clips.splice(i+1, 0, n); S.sel = n.id; toast('Klip bölündü'); refresh();
+};
+$('bDel').onclick = () => withSel((c, i) => {
+  stop(); S.clips.splice(i, 1);
+  if (!S.clips.some(o => o.el === c.el)) { c.el.pause(); c.el.remove(); }
+  S.sel = S.clips[Math.min(i, S.clips.length-1)]?.id ?? null; seek(Math.min(S.t, total())); toast('Klip silindi');
+});
+$('bLeft').onclick = () => withSel((c, i) => { if (i === 0) return; S.clips.splice(i,1); S.clips.splice(i-1,0,c); seek(offsets()[i-1]); });
+$('bRight').onclick = () => withSel((c, i) => { if (i === S.clips.length-1) return; S.clips.splice(i,1); S.clips.splice(i+1,0,c); seek(offsets()[i+1]); });
+$('bDup').onclick = () => withSel((c, i) => { const n = {...c, id: uid++}; S.clips.splice(i+1, 0, n); S.sel = n.id; toast('Klip çoğaltıldı'); });
+
+function setIn(c, v){ c.in = clamp(v, 0, c.out - 0.1); }
+function setOut(c, v){ c.out = clamp(v, c.in + 0.1, c.dur); }
+$('ciIn').onchange = e => withSel(c => { setIn(c, +e.target.value); seek(S.t); });
+$('ciOut').onchange = e => withSel(c => { setOut(c, +e.target.value); seek(S.t); });
+$('ciInHere').onclick = () => withSel((c, i) => {
+  const local = S.t - offsets()[i];
+  if (local < 0 || local > len(c)) return toast('Oynatma çubuğunu bu klibin üstüne getir');
+  setIn(c, c.in + local); seek(offsets()[i]); toast('Başlangıç kırpıldı');
+});
+$('ciOutHere').onclick = () => withSel((c, i) => {
+  const local = S.t - offsets()[i];
+  if (local < 0 || local > len(c)) return toast('Oynatma çubuğunu bu klibin üstüne getir');
+  setOut(c, c.in + local); toast('Bitiş kırpıldı');
+});
+$('ciVol').oninput = e => { const c = selClip(); if (!c) return; c.vol = e.target.value/100; $('ciVolV').textContent = e.target.value + '%'; if (S.clips[S.cur]?.el === c.el) applyClipGain(c); };
+$('ciMute').onclick = () => withSel(c => { c.muted = !c.muted; if (S.clips[S.cur]?.el === c.el) applyClipGain(c); });
+$('ciLabel').oninput = e => { const c = selClip(); if (c){ c.label = e.target.value; draw(); } };
+
+// ---------- yazılar ----------
+function addText(preset){
+  const x = Object.assign({id: uid++, text:'YAZINI BURAYA YAZ', font:'Impact', size:96, color:'#ffffff', hl:'#ffd400', stroke:'#000000', strokeW:8, y:0.5, box:false, start: S.t, end: Math.min(S.t + 3, Math.max(total(), S.t + 3))}, preset||{});
+  S.texts.push(x); S.selText = x.id; switchTab('R','pText'); loadFont(x.font); refresh();
+}
+$('txAdd').onclick = () => addText();
+$('txHook').onclick = () => addText({text:'BAŞLIĞI BURAYA YAZ', y:0.12, start:0, end:null, size:110});
+function loadFont(f){ if (document.fonts && document.fonts.load) document.fonts.load(`800 60px "${f}"`).then(draw).catch(()=>{}); }
+const tx = fn => e => { const x = selTxt(); if (!x) return; fn(x, e); refresh(); };
+$('txText').oninput = tx((x,e) => x.text = e.target.value);
+$('txFont').onchange = tx((x,e) => { x.font = e.target.value; loadFont(x.font); });
+$('txSize').oninput = tx((x,e) => x.size = +e.target.value);
+$('txColor').oninput = tx((x,e) => x.color = e.target.value);
+$('txHl').oninput = tx((x,e) => x.hl = e.target.value);
+$('txHlBtn').onclick = () => {
+  const x = selTxt(); if (!x) return;
+  const ta = $('txText'); let a = ta.selectionStart, b = ta.selectionEnd, v = ta.value;
+  if (a === b){
+    // seçim yoksa imlecin olduğu kelimeyi al
+    while (a > 0 && !/\s/.test(v[a-1])) a--;
+    while (b < v.length && !/\s/.test(v[b])) b++;
+    if (a === b) return toast('Önce metinde bir kelime seç');
+  }
+  const part = v.slice(a, b);
+  const rep = /^\*[\s\S]*\*$/.test(part) && part.length > 1 ? part.slice(1, -1) : '*' + part.replace(/\*/g,'') + '*';
+  ta.value = v.slice(0, a) + rep + v.slice(b); x.text = ta.value;
+  ta.focus(); ta.setSelectionRange(a, a + rep.length); refresh();
+};
+$('txStroke').oninput = tx((x,e) => x.stroke = e.target.value);
+$('txStrokeW').oninput = tx((x,e) => x.strokeW = clamp(+e.target.value||0, 0, 30));
+$('txY').oninput = tx((x,e) => x.y = e.target.value/100);
+$('txBox').onchange = tx((x,e) => x.box = e.target.checked);
+$('txPosBtns').onclick = tx((x,e) => { const b = e.target.closest('button'); if (b){ x.y = +b.dataset.pos; x.x = 0.5; } });
+$('txStart').onchange = tx((x,e) => x.start = Math.max(0, +e.target.value||0));
+$('txEnd').onchange = tx((x,e) => x.end = e.target.value === '' ? null : Math.max(x.start + 0.1, +e.target.value));
+$('txStartHere').onclick = tx(x => { x.start = S.t; if (x.end != null && x.end <= x.start) x.end = x.start + 1; });
+$('txEndHere').onclick = tx(x => { x.end = Math.max(x.start + 0.1, S.t); });
+$('txDel').onclick = () => { S.texts = S.texts.filter(x => x.id !== S.selText); S.selText = null; refresh(); toast('Yazı silindi'); };
+
+// ---------- görüntü ----------
+function seg(boxId, attr, key){
+  $(boxId).onclick = e => { const b = e.target.closest('button'); if (!b) return;
+    S[key] = b.dataset[attr]; $(boxId).querySelectorAll('button').forEach(o => o.classList.toggle('on', o === b)); refresh(); };
+}
+seg('fmtBtns', 'fmt', 'fmt'); seg('fitBtns', 'fit', 'fit');
+$('bgColor').oninput = e => { S.bg = e.target.value; draw(); };
+function slider(id, key, scale){ $(id).oninput = e => { S[key] = +e.target.value * (scale||1); $(id+'V').textContent = e.target.value + '%'; draw(); }; }
+slider('bright','bright'); slider('contrast','contrast'); slider('sat','sat'); slider('zoom','zoom',0.01);
+$('lookReset').onclick = () => { for (const k of ['bright','contrast','sat']){ S[k] = 100; $(k).value = 100; $(k+'V').textContent = '100%'; } S.zoom = 1; $('zoom').value = 100; $('zoomV').textContent = '100%'; draw(); toast('Renkler sıfırlandı'); };
+
+// ---------- ses ----------
+$('master').oninput = e => { S.master = e.target.value/100; $('masterV').textContent = e.target.value + '%'; if (masterGain) masterGain.gain.value = S.master; };
+$('voVol').oninput = e => { S.voVol = e.target.value/100; $('voVolV').textContent = e.target.value + '%'; if (voGain) voGain.gain.value = S.voVol; };
+$('duckOn').onchange = e => { S.duck.on = e.target.checked; };
+$('duckLvl').oninput = e => { S.duck.lvl = e.target.value/100; $('duckLvlV').textContent = e.target.value + '%'; };
+
+const FX = ['fxClean','fxGate','fxVoice','fxComp','fxNorm'];
+let recording = false, abOn = false;
+
+function peaksOf(buf, n){
+  const out = new Float32Array(n), L = buf.length, chs = [...Array(buf.numberOfChannels)].map((_,i) => buf.getChannelData(i));
+  for (let k = 0; k < n; k++){
+    const a = Math.floor(k*L/n), b = Math.floor((k+1)*L/n); let m = 0;
+    for (const d of chs) for (let i = a; i < b; i += 4){ const v = Math.abs(d[i]); if (v > m) m = v; }
+    out[k] = m;
+  }
+  let mx = 0; for (const v of out) if (v > mx) mx = v;
+  if (mx > 0) for (let k = 0; k < n; k++) out[k] /= mx;
+  return out;
+}
+function wavBlob(buf){
+  const ch = buf.numberOfChannels, sr = buf.sampleRate, n = buf.length, bytes = 44 + n*ch*2;
+  const dv = new DataView(new ArrayBuffer(bytes)); let o = 0;
+  const str = t => { for (const c of t) dv.setUint8(o++, c.charCodeAt(0)); }, u32 = v => { dv.setUint32(o, v, true); o += 4; }, u16 = v => { dv.setUint16(o, v, true); o += 2; };
+  str('RIFF'); u32(bytes-8); str('WAVE'); str('fmt '); u32(16); u16(1); u16(ch); u32(sr); u32(sr*ch*2); u16(ch*2); u16(16); str('data'); u32(n*ch*2);
+  const d = [...Array(ch)].map((_,i) => buf.getChannelData(i));
+  for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++){ const v = Math.max(-1, Math.min(1, d[c][i])); dv.setInt16(o, v < 0 ? v*0x8000 : v*0x7fff, true); o += 2; }
+  return new Blob([dv], {type:'audio/wav'});
+}
+// Sessiz anlarda gürültüyü bastıran kapı (20 ms pencereler, yumuşak açılıp kapanır)
+function noiseGate(buf){
+  const sr = buf.sampleRate, win = Math.max(64, Math.round(sr*0.02)), n = Math.ceil(buf.length / win);
+  const chs = [...Array(buf.numberOfChannels)].map((_,i) => buf.getChannelData(i));
+  const rms = new Float32Array(n);
+  for (let k = 0; k < n; k++){ let s2 = 0, c = 0; for (const d of chs) for (let i = k*win; i < Math.min(buf.length, (k+1)*win); i++){ s2 += d[i]*d[i]; c++; } rms[k] = Math.sqrt(s2/Math.max(1,c)); }
+  const sorted = [...rms].sort((a,b) => a-b), floor = sorted[Math.floor(n*0.1)] || 0;
+  const thr = Math.max(floor*3, 0.003), low = 0.12, rel = Math.exp(-0.02/0.18);
+  const g = new Float32Array(n); let prev = low;
+  for (let k = 0; k < n; k++){
+    const open = rms[k] >= thr || (k+1 < n && rms[k+1] >= thr) || (k+2 < n && rms[k+2] >= thr);
+    prev = open ? 1 : Math.max(low, prev*rel); g[k] = prev;
+  }
+  for (const d of chs) for (let i = 0; i < buf.length; i++){
+    const f = i/win - 0.5, k = Math.max(0, Math.floor(f)), t = Math.min(1, Math.max(0, f - k));
+    d[i] *= g[k]*(1-t) + (g[Math.min(n-1,k+1)])*t;
+  }
+}
+async function renderVO(){
+  const v = S.vo; if (!v) return;
+  const raw = v.raw, sr = raw.sampleRate, ch = Math.min(2, raw.numberOfChannels);
+  const segLen = Math.max(0.05, v.out - v.in), len = Math.max(1, Math.round(segLen*sr));
+  const on = id => !abOn && $(id).checked;
+  const oc = new OfflineAudioContext(ch, len, sr);
+  const src = oc.createBufferSource(); src.buffer = raw;
+  let node = src;
+  const add = n => { node.connect(n); node = n; };
+  if (on('fxClean')){
+    const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 85; hp.Q.value = 0.7; add(hp);
+    const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 13000; add(lp);
+  }
+  if (on('fxVoice')){
+    const mud = oc.createBiquadFilter(); mud.type = 'peaking'; mud.frequency.value = 280; mud.Q.value = 1; mud.gain.value = -3; add(mud);
+    const pres = oc.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 3200; pres.Q.value = 0.9; pres.gain.value = 4; add(pres);
+    const air = oc.createBiquadFilter(); air.type = 'highshelf'; air.frequency.value = 9000; air.gain.value = 2; add(air);
+  }
+  if (on('fxComp')){
+    const cp = oc.createDynamicsCompressor(); cp.threshold.value = -24; cp.knee.value = 8; cp.ratio.value = 4; cp.attack.value = 0.005; cp.release.value = 0.2; add(cp);
+    const mk = oc.createGain(); mk.gain.value = 1.6; add(mk);
+  }
+  const fade = oc.createGain(); add(fade);
+  const fi = Math.min(v.fadeIn, segLen/2), fo = Math.min(v.fadeOut, segLen/2);
+  fade.gain.setValueAtTime(fi > 0 ? 0 : 1, 0);
+  if (fi > 0) fade.gain.linearRampToValueAtTime(1, fi);
+  if (fo > 0){ fade.gain.setValueAtTime(1, segLen - fo); fade.gain.linearRampToValueAtTime(0, segLen); }
+  node.connect(oc.destination);
+  src.start(0, v.in, segLen);
+  const out = await oc.startRendering();
+  if (on('fxGate')) noiseGate(out);
+  if (on('fxNorm')){
+    let pk = 0; for (let c = 0; c < out.numberOfChannels; c++){ const d = out.getChannelData(c); for (let i = 0; i < d.length; i++){ const a = Math.abs(d[i]); if (a > pk) pk = a; } }
+    if (pk > 0.0001){ const k = 0.89 / pk; for (let c = 0; c < out.numberOfChannels; c++){ const d = out.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] *= k; } }
+  }
+  if (S.vo !== v) return; // bu arada değişti
+  const el = document.createElement('audio'); el.preload = 'auto'; el.src = URL.createObjectURL(wavBlob(out));
+  $('hiddenMedia').appendChild(el);
+  await new Promise(r => { el.addEventListener('loadedmetadata', r, {once:true}); el.addEventListener('error', r, {once:true}); });
+  const old = v.el; v.el = el; v.dur = segLen; v.peaks = peaksOf(out, 1200);
+  if (old){ old.pause(); URL.revokeObjectURL(old.src); old.remove(); }
+  ensureAudio();
+  if (S.playing){ v.el.pause(); voTick(); }
+  const fx = FX.filter(id => $(id).checked).length;
+  $('fxState').textContent = abOn ? 'Orijinal dinleniyor (iyileştirmeler kapalı)' : `${fx}/5 iyileştirme açık`;
+  refresh();
+}
+let rvT = 0;
+const rerender = () => { clearTimeout(rvT); rvT = setTimeout(() => renderVO().catch(e => toast('Ses işlenemedi: ' + e.message)), 250); };
+
+async function setVO(blobOrFile, name, offset){
+  ensureAudio();
+  let raw;
+  try { raw = await AC.decodeAudioData(await blobOrFile.arrayBuffer()); }
+  catch(e){ return toast('Ses okunamadı'); }
+  if (S.vo && S.vo.el){ S.vo.el.pause(); S.vo.el.remove(); }
+  S.vo = {name, raw, el:null, dur: raw.duration, in:0, out: raw.duration, offset: offset || 0, fadeIn:0, fadeOut:0, peaks:null, rawPeaks: peaksOf(raw, 1200)};
+  abOn = false; $('fxAB').classList.remove('on'); $('fxAB').textContent = 'Orijinali dinle';
+  await renderVO();
+  toast('Seslendirme eklendi');
+}
+function refreshVO(){
+  const v = S.vo;
+  $('voInfo').textContent = v ? `${v.name} · ${v.dur.toFixed(2)} sn · videoda ${v.offset.toFixed(2)} sn'de başlar` : (recording ? 'Kayıt sürüyor…' : 'Seslendirme yok.');
+  $('voEdit').style.display = v ? 'block' : 'none';
+  if (!v) return;
+  const fx = (id, val) => { if (document.activeElement !== $(id)) $(id).value = val; };
+  fx('voIn', v.in.toFixed(2)); fx('voOut', v.out.toFixed(2)); fx('voOff', v.offset.toFixed(2));
+  $('voIn').max = $('voOut').max = v.raw.duration.toFixed(2);
+  $('voFadeIn').value = Math.round(v.fadeIn*10); $('voFadeInV').textContent = v.fadeIn.toFixed(1) + ' sn';
+  $('voFadeOut').value = Math.round(v.fadeOut*10); $('voFadeOutV').textContent = v.fadeOut.toFixed(1) + ' sn';
+  drawVoWave();
+}
+function drawVoWave(){
+  const v = S.vo, c = $('voWave'); if (!v) return;
+  const g = c.getContext('2d'), W = c.width, H = c.height, D = v.raw.duration;
+  drawPeaks(c, v.rawPeaks, 0, 1, '#e8833a');
+  g.fillStyle = 'rgba(244,246,248,.78)';
+  g.fillRect(0, 0, W*v.in/D, H); g.fillRect(W*v.out/D, 0, W - W*v.out/D, H);
+  g.fillStyle = '#1c2126'; g.fillRect(Math.round(W*v.in/D), 0, 2, H); g.fillRect(Math.round(W*v.out/D)-2, 0, 2, H);
+  const l = voLocal();
+  if (l >= 0 && l <= v.dur){ g.fillStyle = '#d6334a'; g.fillRect(Math.round(W*(v.in + l)/D), 0, 2, H); }
+}
+$('voWave').onclick = e => {
+  const v = S.vo; if (!v) return;
+  const r = e.currentTarget.getBoundingClientRect(), t = (e.clientX - r.left)/r.width * v.raw.duration;
+  seek(v.offset + clamp(t, v.in, v.out) - v.in);
+};
+$('voIn').onchange = e => { const v = S.vo; if (!v) return; v.in = clamp(+e.target.value||0, 0, v.out - 0.1); rerender(); };
+$('voOut').onchange = e => { const v = S.vo; if (!v) return; v.out = clamp(+e.target.value||0, v.in + 0.1, v.raw.duration); rerender(); };
+$('voOff').onchange = e => { const v = S.vo; if (!v) return; v.offset = Math.max(0, +e.target.value||0); syncVO(); refresh(); };
+$('voOffHere').onclick = () => { const v = S.vo; if (!v) return; v.offset = S.t; syncVO(); refresh(); toast('Seslendirme ' + fmtT(S.t) + "'den başlıyor"); };
+$('voFadeIn').oninput = e => { if (!S.vo) return; S.vo.fadeIn = e.target.value/10; $('voFadeInV').textContent = S.vo.fadeIn.toFixed(1) + ' sn'; rerender(); };
+$('voFadeOut').oninput = e => { if (!S.vo) return; S.vo.fadeOut = e.target.value/10; $('voFadeOutV').textContent = S.vo.fadeOut.toFixed(1) + ' sn'; rerender(); };
+FX.forEach(id => $(id).onchange = () => { if (abOn){ abOn = false; $('fxAB').classList.remove('on'); $('fxAB').textContent = 'Orijinali dinle'; } rerender(); });
+$('fxAB').onclick = () => { abOn = !abOn; $('fxAB').classList.toggle('on', abOn); $('fxAB').textContent = abOn ? 'İyileştirilmişe dön' : 'Orijinali dinle'; rerender(); };
+$('voUpload').onclick = () => $('fileAudio').click();
+$('fileAudio').onchange = e => { const f = e.target.files[0]; if (f) setVO(f, f.name, S.t); e.target.value = ''; };
+$('voRemove').onclick = () => { if (!S.vo) return; S.vo.el && (S.vo.el.pause(), S.vo.el.remove()); S.vo = null; refresh(); toast('Seslendirme kaldırıldı'); };
+
+// zaman çizelgesinde seslendirmeyi sürükle
+$('trVO').addEventListener('pointerdown', e => {
+  const b = e.target.closest('.blk'); if (!b || !S.vo) return;
+  e.preventDefault(); b.setPointerCapture(e.pointerId); b.style.cursor = 'grabbing';
+  const x0 = e.clientX, o0 = S.vo.offset;
+  const mv = ev => { S.vo.offset = Math.max(0, o0 + (ev.clientX - x0)/S.pps); b.style.left = (S.vo.offset*S.pps) + 'px'; $('voOff').value = S.vo.offset.toFixed(2); };
+  const up = () => { b.removeEventListener('pointermove', mv); b.removeEventListener('pointerup', up); syncVO(); refresh(); };
+  b.addEventListener('pointermove', mv); b.addEventListener('pointerup', up);
+});
+
+// mikrofon kaydı: geri sayım + seviye göstergesi + oynatma çubuğundan başlar
+let micRec = null, micStream = null, meterRAF = 0, cdTimer = 0;
+function stopMeter(){ cancelAnimationFrame(meterRAF); $('voMeter').style.width = '0'; }
+function setRecUI(state){
+  $('voRec').textContent = state === 'rec' ? '■ Durdur' : state === 'cd' ? '✕ İptal' : '● Kaydet';
+  $('voRec').classList.toggle('danger', state !== 'idle'); $('voRec').classList.toggle('primary', state === 'idle');
+  $('recDot').style.display = state === 'rec' ? 'block' : 'none';
+  if (state !== 'cd') $('countdown').style.display = 'none';
+}
+function cleanupMic(){ stopMeter(); if (micStream) micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+$('voRec').onclick = async () => {
+  if (micRec && micRec.state === 'recording'){ micRec.stop(); return; }
+  if (cdTimer){ clearInterval(cdTimer); cdTimer = 0; cleanupMic(); setRecUI('idle'); toast('Kayıt iptal'); return; }
+  try {
+    ensureAudio();
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:false, channelCount:1}});
+  } catch(e){ return toast('Mikrofon açılamadı: ' + e.message); }
+  // seviye göstergesi
+  const an = AC.createAnalyser(); an.fftSize = 1024; AC.createMediaStreamSource(micStream).connect(an);
+  const buf = new Float32Array(an.fftSize);
+  const meter = () => { an.getFloatTimeDomainData(buf); let pk = 0; for (const v of buf){ const a = Math.abs(v); if (a > pk) pk = a; }
+    $('voMeter').style.width = Math.min(100, Math.round(pk*130)) + '%'; meterRAF = requestAnimationFrame(meter); };
+  meter();
+  stop();
+  const startAt = S.t; let n = 3;
+  setRecUI('cd'); $('countdown').style.display = 'flex'; $('countdown').textContent = n;
+  cdTimer = setInterval(() => {
+    n--; if (n > 0){ $('countdown').textContent = n; return; }
+    clearInterval(cdTimer); cdTimer = 0; $('countdown').style.display = 'none';
+    const chunks = [];
+    micRec = new MediaRecorder(micStream);
+    micRec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    micRec.onstop = async () => {
+      recording = false; cleanupMic(); setRecUI('idle'); micRec = null;
+      if (S.playing) stop();
+      if (voGain) voGain.gain.value = S.voVol;
+      await setVO(new Blob(chunks, {type: chunks[0]?.type || 'audio/webm'}), 'Mikrofon kaydı', startAt);
+    };
+    recording = true; if (S.vo && S.vo.el) S.vo.el.pause(); if (voGain) voGain.gain.value = 0;
+    micRec.start(); setRecUI('rec'); refreshVO();
+    if ($('voRecPlay').checked && S.clips.length){ seek(startAt); play(); }
+  }, 1000);
+};
+
+// ---------- sıralama ----------
+$('rankOn').onclick = () => { S.rank.on = !S.rank.on; refresh(); };
+$('rankDir').onchange = e => { S.rank.dir = e.target.value; draw(); };
+$('rankPos').onchange = e => { S.rank.pos = e.target.value; draw(); };
+$('rankColor').oninput = e => { S.rank.color = e.target.value; draw(); };
+$('rankText').oninput = e => { S.rank.text = e.target.value; draw(); };
+
+// ---------- dışa aktarma ----------
+function pickMime(){
+  const opts = [['video/mp4;codecs=avc1.42E01E,mp4a.40.2','mp4'],['video/mp4','mp4'],['video/webm;codecs=vp9,opus','webm'],['video/webm;codecs=vp8,opus','webm'],['video/webm','webm']];
+  for (const [m, ext] of opts) if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return {m, ext};
+  return null;
+}
+$('btnExport').onclick = () => {
+  if (!S.clips.length || S.exporting) return;
+  const mm = pickMime(); if (!mm) return toast('Bu tarayıcı video kaydını desteklemiyor');
+  ensureAudio(); stop();
+  const stream = cv.captureStream(30);
+  recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  const rec = new MediaRecorder(stream, {mimeType: mm.m, videoBitsPerSecond: 8_000_000});
+  const chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  S.exporting = {rec, chunks, ext: mm.ext, cancelled: false};
+  rec.onstop = () => {
+    const ex = S.exporting; S.exporting = null;
+    if (ex.cancelled){ $('exportBox').classList.remove('show'); return; }
+    const blob = new Blob(chunks, {type: mm.m.split(';')[0]});
+    const url = URL.createObjectURL(blob);
+    const name = `kurgu-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.${mm.ext}`;
+    $('exDl').href = url; $('exDl').download = name; $('exDl').style.display = 'block';
+    $('exDl').dataset.size = blob.size;
+    $('exMsg').textContent = `Hazır: ${name} · ${(blob.size/1048576).toFixed(1)} MB (${mm.ext.toUpperCase()})`;
+    $('exCancel').textContent = 'Kapat'; $('exBar').style.width = '100%';
+  };
+  $('exMsg').textContent = 'Video gerçek zamanlı kaydediliyor. Bu sekmeyi açık tut.';
+  $('exDl').style.display = 'none'; $('exCancel').textContent = 'İptal'; $('exBar').style.width = '0';
+  $('exportBox').classList.add('show');
+  seek(0);
+  rec.start(250);
+  setTimeout(play, 120);
+};
+function finishExport(){ if (S.exporting && S.exporting.rec.state !== 'inactive') setTimeout(() => S.exporting && S.exporting.rec.stop(), 150); }
+$('exCancel').onclick = () => {
+  if (S.exporting){ S.exporting.cancelled = true; stop(); S.exporting.rec.stop(); toast('Dışa aktarma iptal'); }
+  else $('exportBox').classList.remove('show');
+};
+
+// ---------- sıfırla ----------
+let resetArm = 0;
+$('btnReset').onclick = () => {
+  if (Date.now() - resetArm > 2500){ resetArm = Date.now(); $('btnReset').textContent = 'Emin misin?'; setTimeout(()=>$('btnReset').textContent='Sıfırla', 2500); return; }
+  stop(); S.clips.forEach(c => c.el.remove()); if (S.vo) S.vo.el.remove();
+  Object.assign(S, {clips:[], texts:[], vo:null, sel:null, selText:null, t:0, cur:0});
+  $('btnReset').textContent = 'Sıfırla'; resetArm = 0; refresh(); toast('Proje sıfırlandı');
+};
+
+// ---------- klavye ----------
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea,select')) return;
+  if (e.code === 'Space'){ e.preventDefault(); toggle(); }
+  else if (e.key === 's' || e.key === 'S') $('bSplit').click();
+  else if (e.key === 'Delete' || e.key === 'Backspace') $('bDel').click();
+  else if (e.key === 'ArrowLeft') seek(S.t - (e.shiftKey ? 1 : 1/30));
+  else if (e.key === 'ArrowRight') seek(S.t + (e.shiftKey ? 1 : 1/30));
+});
+
+window.__kurgu = S; // test için
+refresh(); requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
