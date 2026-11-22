@@ -144,6 +144,12 @@ footer{border-top:1px solid var(--line);background:var(--panel)}
 .opts3{grid-template-columns:1fr 1fr 1fr}
 .opts3 button{padding:7px 8px}
 .opts3 button small{font-size:10.5px}
+.sbRow{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--rs);padding:8px}
+.sbRow.on{border-color:var(--acc);background:var(--accSoft)}
+.sbRow textarea{grid-column:1/-1;min-height:44px;font-weight:500}
+.sbRow input{min-height:30px;padding:4px 6px;font-variant-numeric:tabular-nums}
+.sbRow button{min-height:30px;padding:2px 9px}
+#sbBar div{background:var(--acc)}
 label.chk{display:flex;gap:8px;align-items:center;color:var(--text);margin:7px 0;font-size:13px}
 label.chk input{width:16px;flex:0 0 auto}
 
@@ -362,6 +368,7 @@ label.chk input{width:16px;flex:0 0 auto}
   <section class="panel">
     <div class="tabs" data-group="R">
       <button class="active" data-tab="pText">Yazı</button>
+      <button data-tab="pSubs">Altyazı</button>
       <button data-tab="pLook">Görüntü</button>
     </div>
     <div class="pane active" id="pText">
@@ -477,6 +484,49 @@ label.chk input{width:16px;flex:0 0 auto}
       </div>
     </div>
 
+    <div class="pane" id="pSubs">
+      <button id="sbAuto" class="primary" style="width:100%">✨ Otomatik altyazı oluştur</button>
+      <div class="row" style="margin-top:6px">
+        <div><label style="margin-top:0">Konuşma dili</label>
+          <select id="sbLang"><option value="turkish">Türkçe</option><option value="english">İngilizce</option><option value="">Otomatik algıla</option></select></div>
+      </div>
+      <div class="meter" id="sbBar" style="display:none"><div></div></div>
+      <div class="hint" id="sbProg"></div>
+      <p class="hint">Konuşma bilgisayarında yazıya dökülür (Whisper), ses hiçbir yere gönderilmez. İlk kullanımda model bir kez indirilir (~80 MB). Seslendirme varsa ondan, yoksa kliplerin sesinden çıkarılır.</p>
+      <div class="row">
+        <button id="sbImport">SRT / VTT yükle</button>
+        <button id="sbAdd" title="Oynatma çubuğundaki ana yeni satır ekle">+ Satır ekle</button>
+      </div>
+      <input type="file" id="fileSub" accept=".srt,.vtt,text/vtt,application/x-subrip" hidden>
+
+      <div id="sbBody" style="display:none">
+        <h3 style="margin-top:16px">Stil</h3>
+        <div class="opts" id="sbPresets">
+          <button data-p="karaoke" class="on"><b>Kelime vurgulu</b><small>Söylenen kelime renklenir</small></button>
+          <button data-p="classic"><b>Klasik</b><small>Beyaz yazı, siyah kenar</small></button>
+          <button data-p="box"><b>Kutulu</b><small>Yarı saydam kutu içinde</small></button>
+          <button data-p="minimal"><b>Minimal</b><small>İnce, gölgeli, sade</small></button>
+        </div>
+        <div class="row">
+          <div><label>Font</label><select id="sbFont"><option value="Montserrat">Montserrat</option><option value="Poppins">Poppins</option><option value="Impact">Impact</option><option value="Anton">Anton</option><option value="Bebas Neue">Bebas Neue</option><option value="Arial">Arial</option></select></div>
+          <div><label>Boyut <span id="sbSizeV"></span></label><input type="range" id="sbSize" min="36" max="140"></div>
+        </div>
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:0 0 auto"><label>Yazı</label><input type="color" id="sbColor"></div>
+          <div style="flex:0 0 auto"><label>Vurgu</label><input type="color" id="sbHl"></div>
+          <label class="chk" style="margin-bottom:8px"><input type="checkbox" id="sbUpper"> BÜYÜK HARF</label>
+        </div>
+        <label>Ekranda en fazla <span id="sbWordsV"></span> kelime</label>
+        <input type="range" id="sbWords" min="1" max="12">
+        <h3 style="margin-top:14px">Konum</h3>
+        <p class="hint" style="margin-top:0">Önizlemede altyazıyı tutup istediğin yere sürükle.</p>
+        <div class="row" id="sbPos"><button data-y="0.18">Üst</button><button data-y="0.5">Orta</button><button data-y="0.72">Alt (güvenli)</button></div>
+        <h3 style="margin-top:14px">Satırlar <span class="mono" id="sbCount"></span></h3>
+        <div class="row"><button id="sbExport">SRT indir</button><button id="sbClear" class="danger">Tümünü sil</button></div>
+        <div class="list" id="sbList"></div>
+      </div>
+    </div>
+
     <div class="pane" id="pLook">
       <h3>Platform</h3>
       <div class="opts" id="fmtBtns">
@@ -577,6 +627,7 @@ const FORMATS = {'9:16':[1080,1920],'4:5':[1080,1350],'1:1':[1080,1080],'16:9':[
 const S = {
   clips: [], texts: [], vo: null,
   transType:'none', transDur:1, music:null,
+  subs:{items:[], style:{preset:'karaoke', font:'Montserrat', size:76, color:'#ffffff', hl:'#ffd400', upper:true, words:4, x:0.5, y:0.72}},
   fmt:'9:16', fit:'blur', blurAmt:0.6, bgDim:0.2, safe:'', bg:'#000000', zoom:1, bright:100, contrast:100, sat:100, master:1, voVol:1,
   duck:{on:true, lvl:0.25},
   rank:{on:false, dir:'down', pos:'tl', color:'#2ee6a6', text:'#04140e'},
@@ -797,6 +848,11 @@ let drag = null;
 cv.addEventListener('pointerdown', e => {
   if (S.exporting) return;
   const p = canvasPt(e), x = textAt(p);
+  if (!x && subBB && p.x >= subBB.x && p.x <= subBB.x + subBB.w && p.y >= subBB.y && p.y <= subBB.y + subBB.h){
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    const st = S.subs.style; drag = {sub: true, dx: p.x - p.W*st.x, dy: p.y - p.H*st.y};
+    switchTab('R','pSubs'); cv.style.cursor = 'grabbing'; return;
+  }
   if (!x){
     const c = S.clips[S.cur]; if (!c || !c.el.videoWidth) return;
     const r = videoRect(c, p.W, p.H); if (!r.mx && !r.my) return;
@@ -814,7 +870,14 @@ cv.addEventListener('pointermove', e => {
   if (!drag){
     let canPan = false; const c = S.clips[S.cur];
     if (c && c.el.videoWidth){ const r = videoRect(c, p.W, p.H); canPan = r.mx > 0 || r.my > 0; }
-    cv.style.cursor = textAt(p) ? 'grab' : canPan ? 'move' : ''; return;
+    const onSub = subBB && p.x >= subBB.x && p.x <= subBB.x + subBB.w && p.y >= subBB.y && p.y <= subBB.y + subBB.h;
+    cv.style.cursor = textAt(p) || onSub ? 'grab' : canPan ? 'move' : ''; return;
+  }
+  if (drag.sub){
+    const st = S.subs.style;
+    st.x = clamp((p.x - drag.dx) / p.W, 0.1, 0.9); st.y = clamp((p.y - drag.dy) / p.H, 0.04, 0.96);
+    if (Math.abs(st.x - 0.5) < 0.015) st.x = 0.5;
+    draw(); return;
   }
   if (drag.pan){
     const c = drag.pan;
@@ -853,6 +916,7 @@ function draw(){
     const end = x.end == null ? Infinity : x.end;
     if (S.t >= x.start && (S.t < end || (end === Infinity))) (x.kind === 'img' ? drawImgLayer : drawText)(x, W, H);
   }
+  drawSubs(W, H);
   if (S.safe && !S.exporting && !S.fullRes) drawSafe(W, H);
   $('empty').style.display = S.clips.length ? 'none' : 'flex';
 }
@@ -942,6 +1006,67 @@ function drawVideo(c, W, H){
     // video kenarına ince gölge: arka plandan ayrışsın
     ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = W*0.02; ctx.strokeStyle = 'rgba(0,0,0,.01)';
     ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.restore();
+  }
+}
+// ---------- altyazı ----------
+let subBB = null;
+// Uzun satırı "sayfalara" böl (ekranda en fazla N kelime), süreyi harf sayısına göre paylaştır
+function subPage(cue, t, N){
+  const words = cue.text.trim().split(/\s+/).filter(Boolean); if (!words.length) return null;
+  const pages = []; for (let i = 0; i < words.length; i += N) pages.push(words.slice(i, i + N));
+  const w8 = pages.map(p => p.join(' ').length + 2), tot = w8.reduce((a, b) => a + b, 0), D = cue.end - cue.start;
+  let acc = cue.start;
+  for (let k = 0; k < pages.length; k++){
+    const d = D * w8[k] / tot;
+    if (t < acc + d || k === pages.length - 1){
+      // sayfa içinde kelime zamanlaması (vurgu için)
+      const lens = pages[k].map(w => w.length + 1), lt = lens.reduce((a, b) => a + b, 0); let wa = acc, cur = -1;
+      for (let j = 0; j < lens.length; j++){ const wd = d * lens[j] / lt; if (t >= wa) cur = j; wa += wd; }
+      return {words: pages[k], cur};
+    }
+    acc += d;
+  }
+  return null;
+}
+function drawSubs(W, H){
+  subBB = null;
+  const st = S.subs.style, cue = S.subs.items.find(c => S.t >= c.start && S.t < c.end); if (!cue) return;
+  const pg = subPage(cue, S.t, st.words); if (!pg) return;
+  const P = st.preset, fs = st.size * (P === 'minimal' ? 0.8 : 1);
+  const weight = P === 'minimal' ? 600 : 800;
+  ctx.save();
+  ctx.font = `${weight} ${fs}px "${st.font}", system-ui, sans-serif`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  const words = pg.words.map(w => st.upper ? w.toLocaleUpperCase('tr-TR') : w);
+  const sp = ctx.measureText(' ').width, maxW = W * 0.86, lines = [[]]; let lw = 0;
+  words.forEach((w, i) => { const ww = ctx.measureText(w).width; const nw = lines[lines.length-1].length ? lw + sp + ww : ww;
+    if (nw > maxW && lines[lines.length-1].length){ lines.push([]); lw = ww; } else lw = nw; lines[lines.length-1].push({w, ww, i}); });
+  const lh = fs * 1.18, cx = W * st.x, cy = H * st.y, y0 = cy - (lines.length - 1) * lh / 2;
+  const widths = lines.map(l => l.reduce((a, o) => a + o.ww, 0) + sp * (l.length - 1)), mw = Math.max(...widths);
+  const pad = fs * 0.32;
+  subBB = {x: cx - mw/2 - pad, y: y0 - lh/2 - pad*0.4, w: mw + pad*2, h: lh * lines.length + pad*0.8};
+  if (P === 'box'){ ctx.fillStyle = 'rgba(0,0,0,.62)'; rrect(subBB.x, subBB.y, subBB.w, subBB.h, fs*0.22); ctx.fill(); }
+  ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+  for (const pass of (P === 'karaoke' || P === 'classic') ? ['stroke','fill'] : ['fill']){
+    lines.forEach((l, k) => {
+      let x0 = cx - widths[k]/2; const y = y0 + k*lh;
+      for (const o of l){
+        const active = P === 'karaoke' && o.i === pg.cur;
+        ctx.save();
+        if (active){ const sx = x0 + o.ww/2; ctx.translate(sx, y); ctx.scale(1.08, 1.08); ctx.translate(-sx, -y); }
+        if (pass === 'stroke'){ ctx.lineWidth = fs * (P === 'karaoke' ? 0.16 : 0.11); ctx.strokeStyle = '#000'; ctx.strokeText(o.w, x0, y); }
+        else {
+          if (P === 'minimal'){ ctx.shadowColor = 'rgba(0,0,0,.75)'; ctx.shadowBlur = fs*0.25; ctx.shadowOffsetY = fs*0.04; }
+          ctx.fillStyle = active ? st.hl : st.color; ctx.fillText(o.w, x0, y);
+        }
+        ctx.restore();
+        x0 += o.ww + sp;
+      }
+    });
+  }
+  ctx.restore();
+  if (!S.exporting && !S.fullRes && $('pSubs').classList.contains('active')){
+    ctx.save(); ctx.setLineDash([W*0.012, W*0.008]); ctx.lineWidth = W*0.003; ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.strokeRect(subBB.x, subBB.y, subBB.w, subBB.h); ctx.restore();
   }
 }
 // Platform arayüzünün kapladığı yaklaşık alanlar (1080×1920 üzerinden px)
@@ -1164,6 +1289,7 @@ function drawTextBg(x, bg, lines, sp, y0, lh, CX, W){
 
 // ---------- arayüz yenileme ----------
 function updTime(){
+  if ($('pSubs').classList.contains('active')) markActiveSub();
   if (S.vo && $('pAudio').classList.contains('active')) drawVoWave();
   const T = total();
   $('tTime').textContent = fmtT(S.t) + ' / ' + fmtT(T);
@@ -1250,7 +1376,7 @@ function refresh(){
     if (document.activeElement !== $('txEnd')) $('txEnd').value = x.end == null ? '' : x.end.toFixed(2);
   }
   // ses
-  refreshVO(); refreshMusic();
+  refreshVO(); refreshMusic(); refreshSubs();
   // sıralama
   $('rankOn').textContent = S.rank.on ? 'Açık' : 'Kapalı'; $('rankOn').classList.toggle('on', S.rank.on);
   drawTimeline(); updTime(); draw();
@@ -1505,6 +1631,160 @@ function slider(id, key, scale){ $(id).oninput = e => { S[key] = +e.target.value
 slider('bright','bright'); slider('contrast','contrast'); slider('sat','sat'); slider('zoom','zoom',0.01);
 $('zoom').addEventListener('change', () => refresh());
 $('lookReset').onclick = () => { for (const k of ['bright','contrast','sat']){ S[k] = 100; $(k).value = 100; $(k+'V').textContent = '100%'; } S.zoom = 1; $('zoom').value = 100; $('zoomV').textContent = '100%'; draw(); toast('Renkler sıfırlandı'); };
+
+// ---------- altyazı paneli ----------
+const fmtSrt = t => { t = Math.max(0, t); const h = Math.floor(t/3600), m = Math.floor(t%3600/60), s = Math.floor(t%60), ms = Math.round((t%1)*1000);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(Math.min(999,ms)).padStart(3,'0')}`; };
+function parseSubs(txt){
+  const out = [], re = /(?:(\d+):)?(\d{1,2}):(\d{2})[,.](\d{1,3})\s*-->\s*(?:(\d+):)?(\d{1,2}):(\d{2})[,.](\d{1,3})/;
+  const tm = (h, m, s, ms) => (+h||0)*3600 + (+m)*60 + (+s) + (+ms.padEnd(3,'0'))/1000;
+  for (const block of txt.replace(/\r/g,'').split(/\n\s*\n/)){
+    const lines = block.split('\n'); const i = lines.findIndex(l => re.test(l)); if (i < 0) continue;
+    const m = lines[i].match(re), text = lines.slice(i+1).join(' ').replace(/<[^>]+>/g,'').trim();
+    if (text) out.push({id: uid++, start: tm(m[1],m[2],m[3],m[4]), end: tm(m[5],m[6],m[7],m[8]), text});
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+function refreshSubs(){
+  const sb = S.subs, st = sb.style, has = sb.items.length > 0;
+  $('sbBody').style.display = has ? 'block' : 'none';
+  $('sbCount').textContent = has ? `(${sb.items.length})` : '';
+  $('sbPresets').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.p === st.preset));
+  $('sbFont').value = st.font; setRange('sbSize', st.size, st.size + 'px');
+  $('sbColor').value = st.color; $('sbHl').value = st.hl; $('sbUpper').checked = st.upper;
+  setRange('sbWords', st.words, String(st.words));
+  $('sbHl').disabled = st.preset !== 'karaoke';
+  // liste: odakta bir alan varken yeniden çizme (yazarken imleç kaçmasın)
+  if ($('sbList').contains(document.activeElement)) return;
+  const L = $('sbList'); L.innerHTML = '';
+  for (const c of sb.items){
+    const r = document.createElement('div'); r.className = 'sbRow'; r.dataset.id = c.id;
+    r.innerHTML = `<input type="number" step="0.1" min="0" data-k="start" title="Başlangıç (sn)"><input type="number" step="0.1" min="0" data-k="end" title="Bitiş (sn)"><button class="ghost" data-del title="Satırı sil">✕</button><textarea data-k="text"></textarea>`;
+    r.querySelector('[data-k=start]').value = c.start.toFixed(2); r.querySelector('[data-k=end]').value = c.end.toFixed(2);
+    r.querySelector('textarea').value = c.text; L.appendChild(r);
+  }
+  markActiveSub();
+}
+function markActiveSub(){
+  const cue = S.subs.items.find(c => S.t >= c.start && S.t < c.end);
+  $('sbList').querySelectorAll('.sbRow').forEach(r => r.classList.toggle('on', !!cue && +r.dataset.id === cue.id));
+}
+const sbStyle = (id, fn, ev='input') => $(id).addEventListener(ev, e => { fn(S.subs.style, e.target); refreshSubs(); draw(); });
+sbStyle('sbFont', (st, t) => { st.font = t.value; loadFont(t.value); }, 'change');
+sbStyle('sbSize', (st, t) => st.size = +t.value);
+sbStyle('sbColor', (st, t) => st.color = t.value);
+sbStyle('sbHl', (st, t) => st.hl = t.value);
+sbStyle('sbUpper', (st, t) => st.upper = t.checked, 'change');
+sbStyle('sbWords', (st, t) => st.words = +t.value);
+$('sbPresets').onclick = e => { const b = e.target.closest('button'); if (!b) return; const st = S.subs.style; st.preset = b.dataset.p;
+  if (st.preset === 'minimal'){ st.upper = false; st.size = Math.min(st.size, 64); }
+  if (st.preset === 'karaoke'){ st.upper = true; st.words = Math.min(st.words, 4); }
+  if (st.preset === 'box' || st.preset === 'classic'){ st.words = Math.max(st.words, 6); }
+  refreshSubs(); draw(); };
+$('sbPos').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.subs.style.y = +b.dataset.y; S.subs.style.x = 0.5; draw(); };
+$('sbList').addEventListener('input', e => {
+  const r = e.target.closest('.sbRow'); if (!r) return; const c = S.subs.items.find(o => o.id === +r.dataset.id); if (!c) return;
+  const k = e.target.dataset.k;
+  if (k === 'text') c.text = e.target.value;
+  else if (k === 'start') c.start = Math.max(0, Math.min(+e.target.value || 0, c.end - 0.1));
+  else if (k === 'end') c.end = Math.max(c.start + 0.1, +e.target.value || 0);
+  draw();
+});
+$('sbList').addEventListener('change', () => { S.subs.items.sort((a, b) => a.start - b.start); });
+$('sbList').addEventListener('click', e => {
+  const r = e.target.closest('.sbRow'); if (!r) return; const id = +r.dataset.id;
+  if (e.target.closest('[data-del]')){ S.subs.items = S.subs.items.filter(o => o.id !== id); refreshSubs(); draw(); return; }
+  const c = S.subs.items.find(o => o.id === id); if (c && e.target.tagName !== 'INPUT') seek(c.start + 0.01);
+});
+$('sbAdd').onclick = () => {
+  const t = S.t, next = S.subs.items.find(c => c.start > t + 0.05);
+  const c = {id: uid++, start: t, end: Math.min(t + 2.5, next ? next.start : t + 2.5, Math.max(total(), t + 0.5)), text: 'Yeni altyazı'};
+  S.subs.items.push(c); S.subs.items.sort((a, b) => a.start - b.start); refreshSubs(); draw();
+  const ta = $('sbList').querySelector(`.sbRow[data-id="${c.id}"] textarea`); if (ta){ ta.focus(); ta.select(); }
+};
+$('sbImport').onclick = () => $('fileSub').click();
+$('fileSub').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const items = parseSubs(await f.text());
+  if (!items.length) return toast('Dosyada altyazı satırı bulunamadı');
+  S.subs.items = items; refreshSubs(); draw(); toast(items.length + ' altyazı satırı yüklendi');
+};
+$('sbExport').onclick = () => {
+  const txt = S.subs.items.map((c, i) => `${i+1}\n${fmtSrt(c.start)} --> ${fmtSrt(c.end)}\n${c.text}\n`).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain'})); a.download = 'altyazi.srt';
+  document.body.appendChild(a); a.click(); a.remove(); toast('SRT indirildi');
+};
+let sbClearArm = 0;
+$('sbClear').onclick = () => {
+  if (Date.now() - sbClearArm > 2500){ sbClearArm = Date.now(); $('sbClear').textContent = 'Emin misin?'; setTimeout(() => $('sbClear').textContent = 'Tümünü sil', 2500); return; }
+  S.subs.items = []; sbClearArm = 0; $('sbClear').textContent = 'Tümünü sil'; refreshSubs(); draw(); toast('Altyazılar silindi (geri alınabilir)');
+};
+
+// Otomatik altyazı: Whisper (transformers.js, Apache-2.0) tarayıcıda çalışır
+let ASR = null, asrBusy = false;
+async function getASR(onProg){
+  if (ASR) return ASR;
+  const T = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2');
+  ASR = await T.pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {dtype: 'q8', progress_callback: onProg});
+  return ASR;
+}
+async function to16k(buf, from, dur){
+  const n = Math.max(1, Math.ceil(dur * 16000)), oc = new OfflineAudioContext(1, n, 16000);
+  const src = oc.createBufferSource(); src.buffer = buf; src.connect(oc.destination); src.start(0, from, dur);
+  return (await oc.startRendering()).getChannelData(0);
+}
+async function audioSegments(){
+  ensureAudio();
+  if (S.vo) return [{buf: S.vo.raw, from: S.vo.in, dur: S.vo.out - S.vo.in, at: S.vo.offset, name: 'seslendirme'}];
+  const segs = [], off = offsets(), cache = {};
+  for (let i = 0; i < S.clips.length; i++){
+    const c = S.clips[i]; if (c.el.isPhoto || c.muted) continue;
+    if (!(c.mid in cache)){
+      const blob = await store.get('m:' + c.mid);
+      try { cache[c.mid] = blob ? await AC.decodeAudioData(await blob.arrayBuffer()) : null; } catch(e){ cache[c.mid] = null; }
+    }
+    if (cache[c.mid]) segs.push({buf: cache[c.mid], from: c.in, dur: len(c), at: off[i], name: c.name});
+  }
+  return segs;
+}
+function sbProgress(txt, frac){
+  $('sbProg').textContent = txt || ''; $('sbBar').style.display = frac == null ? 'none' : 'block';
+  if (frac != null) $('sbBar').firstElementChild.style.width = Math.round(frac*100) + '%';
+}
+$('sbAuto').onclick = async () => {
+  if (asrBusy) return; if (!S.clips.length && !S.vo) return toast('Önce video ya da seslendirme ekle');
+  asrBusy = true; $('sbAuto').disabled = true; stop();
+  try {
+    const files = {};
+    const asr = await getASR(p => {
+      if (p.status === 'progress' && p.file){ files[p.file] = [p.loaded || 0, p.total || 0];
+        const L = Object.values(files).reduce((a, v) => a + v[0], 0), T = Object.values(files).reduce((a, v) => a + v[1], 0);
+        sbProgress(`Model indiriliyor… ${(L/1048576).toFixed(0)} / ${(T/1048576).toFixed(0)} MB`, T ? L/T : 0); }
+      else if (p.status === 'ready') sbProgress('Model hazır', 1);
+    });
+    const segs = await audioSegments();
+    if (!segs.length){ toast('Yazıya dökülecek ses bulunamadı'); return; }
+    const items = [], lang = $('sbLang').value;
+    for (let k = 0; k < segs.length; k++){
+      const g = segs[k];
+      sbProgress(`Yazıya dökülüyor… ${k+1}/${segs.length} (${g.name})`, k/segs.length);
+      const pcm = await to16k(g.buf, g.from, g.dur);
+      const opt = {task: 'transcribe', return_timestamps: true, chunk_length_s: 30, stride_length_s: 5};
+      if (lang) opt.language = lang;
+      const out = await asr(pcm, opt);
+      const chunks = out.chunks && out.chunks.length ? out.chunks : [{text: out.text, timestamp: [0, g.dur]}];
+      for (const ch of chunks){
+        const text = (ch.text || '').trim(); if (!text) continue;
+        const a = ch.timestamp?.[0] ?? 0, b = ch.timestamp?.[1] ?? Math.min(g.dur, a + 3);
+        items.push({id: uid++, start: g.at + Math.max(0, a), end: g.at + Math.min(g.dur, Math.max(a + 0.3, b)), text});
+      }
+    }
+    if (!items.length){ sbProgress(''); toast('Konuşma bulunamadı'); return; }
+    S.subs.items = items.sort((a, b) => a.start - b.start); refreshSubs(); draw();
+    sbProgress(`${items.length} satır oluşturuldu. Satırlara tıklayıp düzeltebilirsin.`);
+  } catch(e){ console.error(e); sbProgress('Otomatik altyazı yapılamadı: ' + (e.message || e)); }
+  finally { asrBusy = false; $('sbAuto').disabled = false; }
+};
 
 // ---------- arka plan müziği ----------
 const MUS = {};
@@ -1854,6 +2134,7 @@ $('btnReset').onclick = () => {
   if (Date.now() - resetArm > 2500){ resetArm = Date.now(); $('btnReset').textContent = 'Emin misin?'; setTimeout(()=>$('btnReset').textContent='Sıfırla', 2500); return; }
   stop(); S.clips.forEach(c => c.el.remove()); if (S.vo) S.vo.el.remove();
   if (S.music) S.music.el.pause();
+  S.subs.items = [];
   Object.assign(S, {clips:[], texts:[], vo:null, music:null, sel:null, selText:null, t:0, cur:0});
   if (S.music) S.music.el.pause(); S.music = null;
   for (const o of [MEDIA, CLIPS, VOS, MUS, IMGS]) for (const k in o) delete o[k];
@@ -1908,6 +2189,7 @@ function snapshot(){
   o.music = S.music ? {aid:S.music.aid, name:S.music.name, vol:S.music.vol, start:S.music.start, loop:S.music.loop, fadeIn:S.music.fadeIn, fadeOut:S.music.fadeOut, duck:S.music.duck} : null;
   o.vo = S.vo ? {vid:S.vo.vid, name:S.vo.name, in:S.vo.in, out:S.vo.out, offset:S.vo.offset, fadeIn:S.vo.fadeIn, fadeOut:S.vo.fadeOut} : null;
   o.fx = Object.fromEntries(FX.map(id => [id, $(id).checked]));
+  o.subs = {items: S.subs.items.map(c => ({...c})), style: {...S.subs.style}};
   return JSON.stringify(o);
 }
 function setRange(id, val, txt){ const e = $(id); if (!e) return; e.value = val; const l = $(id+'V'); if (l) l.textContent = txt; }
@@ -1939,6 +2221,7 @@ function applySnap(json){
     return Object.assign(c, sc);
   }).filter(Boolean);
   S.texts = o.texts.map(x => ({...x}));
+  if (o.subs) S.subs = {items: o.subs.items.map(c => ({...c})), style: {...S.subs.style, ...o.subs.style}};
   if (!S.clips.some(c => c.id === S.sel)) S.sel = S.clips[0]?.id ?? null;
   if (!S.texts.some(x => x.id === S.selText)) S.selText = null;
   // seslendirme
@@ -1988,7 +2271,7 @@ async function restoreProject(){
     if (blob) try { await loadMedia(blob, blob.name || 'video', mid); } catch(e){}
   }
   for (const x of o.texts) if (x.kind === 'img'){ const b = await store.get('i:' + x.imgId); if (b) try { await loadImgBlob(b, x.imgId); } catch(e){} }
-  uid = Math.max(uid, ...o.texts.filter(x => x.kind === 'img').map(x => x.imgId + 1), ...o.clips.map(c => c.id + 1), ...mids.map(m => m + 1), ...o.texts.map(x => x.id + 1), o.vo ? o.vo.vid + 1 : 0, o.music ? o.music.aid + 1 : 0);
+  uid = Math.max(uid, ...((o.subs && o.subs.items) || []).map(c => c.id + 1), ...o.texts.filter(x => x.kind === 'img').map(x => x.imgId + 1), ...o.clips.map(c => c.id + 1), ...mids.map(m => m + 1), ...o.texts.map(x => x.id + 1), o.vo ? o.vo.vid + 1 : 0, o.music ? o.music.aid + 1 : 0);
   if (o.music){
     const mb = await store.get('a:' + o.music.aid);
     if (mb){ const {aid, name, ...props} = o.music; await setMusic(mb, name, {aid, restoring:true, props}); }

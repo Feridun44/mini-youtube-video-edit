@@ -27,6 +27,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - **Boşluk doldurma:** bulanık arka plan, kırp ve doldur (sürükleyerek konum seç), yansıma, düz renk bant
 - **Güvenli alan kılavuzu:** TikTok, Reels ve Shorts arayüzünün kapladığı yerleri önizlemede gösterir
 - **Yazı:** font, boyut, renk, kenarlık, önizlemede sürükleyerek taşıma, yazı arka planı (kutu, satır, hap, kelime, bant, parıltı, çerçeve, eğik; renk/saydamlık/köşe ayarlı), her kelimeye ayrı renk (kelimeyi seç → renk seç → "Seçili kelimeyi renklendir")
+- **Altyazı:** tarayıcıda otomatik altyazı (Whisper, ses dışarı gönderilmez), SRT/VTT içe/dışa aktarma, elle satır ekleme ve düzenleme; kelime vurgulu / klasik / kutulu / minimal stiller; önizlemede sürükleyerek konumlama
 - **Görüntü:** parlaklık, kontrast, doygunluk, yakınlaştırma
 - **Seslendirme:** geri sayımlı mikrofon kaydı, seviye göstergesi, dalga görünümü, kırpma, kaydırma, açılış/kapanış geçişi
 - **Ses iyileştirme:** uğultu temizleme, gürültü kapısı, EQ, kompresör, normalize, önce/sonra dinleme
@@ -43,6 +44,7 @@ Sonra tarayıcıda aç: **http://localhost:8080**
 - Dışa aktarma gerçek zamanlıdır: 30 sn'lik video yaklaşık 30 sn sürer, sekmeyi açık tut.
 - Arayüz fontu Plus Jakarta Sans (SIL Open Font License), Google Fonts'tan yüklenir.
 - Fontlar: Anton, Bebas Neue, Montserrat, Poppins Google Fonts'tan yüklenir (SIL Open Font License). Impact, Arial ve Georgia sistem fontlarıdır, bilgisayarında yoksa yedek font kullanılır.
+- Otomatik altyazı için [Transformers.js](https://github.com/huggingface/transformers.js) (Apache-2.0) ve Whisper base modeli (MIT) ilk kullanımda indirilir (~80 MB), sonra tarayıcı önbelleğinde kalır.
 - MP4 dönüştürme için [Mediabunny](https://mediabunny.dev) (MPL-2.0) dışa aktarma sırasında CDN'den yüklenir; bunun için internet gerekir. İnternet yoksa ham kayıt indirilir.
 - Bu proje YouTube veya Google ile bağlantılı değildir.
 
